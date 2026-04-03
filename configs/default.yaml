@@ -1,0 +1,25 @@
+# Something-Something V2 - Shared Configuration
+# All teammates should reference these defaults.
+
+dataset:
+  root: "data/something-something-v2"          # videos dir (contains {id}.webm files)
+  annotations_dir: "data/something-something-v2/annotations"
+  train_json: "something-something-v2-train.json"
+  val_json: "something-something-v2-validation.json"
+  test_json: "something-something-v2-test.json"
+  labels_json: "something-something-v2-labels.json"
+  num_classes: 174
+
+video:
+  num_frames: 8           # uniform temporal sampling (8 or 16)
+  frame_size: 224
+  mean: [0.485, 0.456, 0.406]   # ImageNet
+  std: [0.229, 0.224, 0.225]
+
+dataloader:
+  batch_size: 16
+  num_workers: 4
+  pin_memory: true
+
+evaluation:
+  results_dir: "results"
