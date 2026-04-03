@@ -21,5 +21,20 @@ dataloader:
   num_workers: 4
   pin_memory: true
 
+augmentation:
+  # Applied automatically by the shared pipeline.
+  # Train only -- val/test get Resize(256) + CenterCrop(224).
+  random_resized_crop:
+    scale: [0.6, 1.0]
+    ratio: [0.75, 1.333]
+  color_jitter:
+    brightness: 0.2
+    contrast: 0.2
+    saturation: 0.2
+    hue: 0.05
+  # DO NOT enable horizontal flip. SSv2 is direction-sensitive.
+  # "Pushing left" and "Pushing right" are different classes.
+  horizontal_flip: false
+
 evaluation:
   results_dir: "results"

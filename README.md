@@ -62,7 +62,10 @@ from shared import get_dataloader
 train_loader = get_dataloader(split="train", batch_size=16, num_frames=8)
 val_loader = get_dataloader(split="val", batch_size=32, num_frames=8)
 
-for frames, labels in train_loader:
+for batch in train_loader:
+    if batch is None:
+        continue  # skipped corrupt videos (extremely rare, see note below)
+    frames, labels = batch
     # frames: (B, T, C, H, W) float32, ImageNet-normalized
     # labels: (B,) int64
     ...
@@ -72,7 +75,46 @@ for frames, labels in train_loader:
 - `num_frames` — frames to sample per video (default 8, use 16 for transformers)
 - `frame_size` — spatial resolution (default 224)
 - `num_workers` — dataloader workers (default 4)
-- `transform` — pass a custom `torchvision.transforms.Compose` to override the default resize + ImageNet normalize
+- `transform` — pass a custom `torchvision.transforms.Compose` to override **all** default transforms
+
+### What the pipeline does for you
+
+**Video loading** — Tries decord first (faster), automatically falls back to OpenCV if decord chokes on a video. If both fail, the video is skipped with a warning instead of crashing your training run. You don't need to handle this.
+
+**Augmentation (train split only):**
+- `RandomResizedCrop(224, scale=0.6-1.0)` — random spatial crops
+- `ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05)` — color augmentation
+- ImageNet normalization
+
+**Val/test transforms:**
+- `Resize(256)` + `CenterCrop(224)` — deterministic, no randomness
+- ImageNet normalization
+
+**Important: NO horizontal flip.** SSv2 is direction-sensitive. "Pushing something from left to right" and "Pushing something from right to left" are different classes. If you add your own transforms, do not flip.
+
+### If your model needs something different
+
+The shared pipeline returns `(B, T, C, H, W)`. If your model needs a different format:
+
+- **R(2+1)D** needs `(B, C, T, H, W)` — just add `frames = frames.permute(0, 2, 1, 3, 4)` in your training loop
+- **SlowFast** needs dual pathways — sample your own slow/fast frames on top of the shared loader, or write a custom dataset that wraps the shared one
+- **Qwen / VLMs** need text+vision — you'll need your own data loading for the text side
+
+If you pass `transform=` to override, you get full control. The shared defaults are just there so you don't have to think about it for standard models.
+
+### The `batch is None` thing
+
+If every single video in a batch fails to decode, the batch comes back as `None`. This should basically never happen (every video in a batch of 16 would have to be corrupt), but guard against it:
+
+```python
+for batch in train_loader:
+    if batch is None:
+        continue
+    frames, labels = batch
+    # ...
+```
+
+One line. Just do it.
 
 ### Evaluation
 
