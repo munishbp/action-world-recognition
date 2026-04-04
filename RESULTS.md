@@ -19,7 +19,7 @@ The headline table. This is what goes in the paper.
 | VideoMAE | Transformer | Aiden | | | | | |
 | VideoMamba | SSM | Kenneth | | | | | |
 | CNN+ConvLSTM | CNN+RNN | Kenneth | | | | | |
-| ST-GCN | GNN | Munish | | | | 3.1M | 3.1M |
+| ST-GCN | GNN | Munish | 0.0394 | 0.1231 | 0.0192 | 3.1M | 3.1M |
 | PredRNN | World Model | Munish | | | | | |
 | Qwen3.5-9B | VLM (QLoRA) | Munish | | | | | |
 
@@ -38,7 +38,7 @@ How expensive was each model to train. Important for the cost-vs-accuracy analys
 | VideoMAE | | | | 224 | | | |
 | VideoMamba | | | | 224 | | | |
 | CNN+ConvLSTM | | | | 224 | | | |
-| ST-GCN | | | 16 | N/A | 64 | 50 | |
+| ST-GCN | 5.5 | 0.86 | 16 | N/A | 64 | 50 | RTX 5090 |
 | PredRNN | | | | 224 | | | |
 | Qwen3.5-9B | | | | | | | |
 
@@ -172,14 +172,14 @@ Fill in anything notable about your model -- what worked, what didn't, any surpr
 
 ### ST-GCN (Munish)
 - Pretrained from: trained from scratch
-- Fine-tuning strategy: full training, SGD, LR 0.1 decayed at epochs 30/40
+- Fine-tuning strategy: full training, SGD, LR 0.1 decayed by 0.1x at epochs 30/40
 - Keypoint extraction: MediaPipe PoseLandmarker, 33 joints, 16 frames/video
-- Detection rate (val): 55.6% (expected -- SSv2 often shows only hands, no full body)
+- Detection rate: train 52.9%, val 55.6%, test 55.5% (expected -- SSv2 often shows only hands, no full body)
 - Input: skeleton keypoints (x, y, visibility, dx, dy) -- no RGB
-- Best val epoch:
-- What worked:
-- What didn't:
-- Failure modes:
+- Best val epoch: 33 (val acc 0.0519)
+- What worked: LR decay at epoch 30 gave an immediate accuracy bump (4.7% -> 5.2%). Velocity features (dx, dy) help with direction-sensitive classes.
+- What didn't: Accuracy plateaus early (~epoch 10) and overfits after epoch 33. Skeleton-only representation fundamentally can't see objects being manipulated.
+- Failure modes: Most classes get 0% accuracy. Only works on motion-heavy classes where body pose carries signal (class 171: 38%, class 94: 36%, class 43: 35%). Completely fails on fine-grained hand-object interactions.
 
 ### PredRNN (Munish)
 - Pretrained from:

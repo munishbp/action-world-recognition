@@ -7,6 +7,7 @@ Usage:
 """
 
 import argparse
+import csv
 import os
 import sys
 import time
@@ -140,6 +141,13 @@ def main():
     # Checkpoint dir
     os.makedirs(config.CHECKPOINT_DIR, exist_ok=True)
 
+    # CSV metrics log (clean, no tqdm noise -- use this for graphs)
+    metrics_path = os.path.join(config.CHECKPOINT_DIR, "metrics.csv")
+    metrics_fields = ["epoch", "lr", "train_loss", "train_acc", "val_loss", "val_acc", "best_val_acc"]
+    if not os.path.exists(metrics_path):
+        with open(metrics_path, "w", newline="") as f:
+            csv.DictWriter(f, fieldnames=metrics_fields).writeheader()
+
     # Training loop
     print(f"\nTraining for {args.epochs} epochs...")
     training_start = time.time()
@@ -176,6 +184,18 @@ def main():
         torch.save(ckpt, os.path.join(config.CHECKPOINT_DIR, "last.pt"))
         if is_best:
             torch.save(ckpt, os.path.join(config.CHECKPOINT_DIR, "best.pt"))
+
+        # Append to CSV metrics log
+        with open(metrics_path, "a", newline="") as f:
+            csv.DictWriter(f, fieldnames=metrics_fields).writerow({
+                "epoch": epoch + 1,
+                "lr": f"{lr:.1e}",
+                "train_loss": f"{train_loss:.4f}",
+                "train_acc": f"{train_acc:.4f}",
+                "val_loss": f"{val_loss:.4f}",
+                "val_acc": f"{val_acc:.4f}",
+                "best_val_acc": f"{best_val_acc:.4f}",
+            })
 
     training_time = time.time() - training_start
     peak_vram = torch.cuda.max_memory_allocated(device) / 1e9 if device.type == "cuda" else 0
