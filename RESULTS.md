@@ -22,6 +22,9 @@ The headline table. This is what goes in the paper.
 | ST-GCN | GNN | Munish | 0.0394 | 0.1231 | 0.0192 | 3.1M | 3.1M |
 | PredRNN | World Model | Munish | | | | | |
 | Qwen3.5-9B | VLM (QLoRA) | Munish | | | | | |
+| **V-JEPA** | **SOTA baseline** | **Munish** | | | | | |
+
+**V-JEPA (SOTA reference):** Meta FAIR's Video JEPA -- self-supervised ViT for video. Repo: `facebookresearch/jepa`. Pretrained checkpoints available, already benchmarked on SSv2. We just need to run eval (no training). This gives us a SOTA reference line to compare all 10 models against. License: CC-BY-NC 4.0 (fine for academic). Needs ~16-24GB VRAM for larger models.
 
 ---
 
