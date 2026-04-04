@@ -4,18 +4,18 @@ Benchmarking 10 video understanding models on [Something-Something V2](https://w
 
 ## Models
 
-| Model | Type | Owner | VRAM Est. |
-|-------|------|-------|-----------|
-| TSM | CNN | Ayaan | ~6 GB |
-| R(2+1)D | CNN | Ayaan | ~8 GB |
-| SlowFast | CNN | Aiden | ~10 GB |
-| TimeSformer | Transformer | Aiden | ~16 GB |
-| VideoMAE | Transformer | Aiden | ~18 GB |
-| VideoMamba | SSM | Kenneth | ~10 GB |
-| CNN+ConvLSTM | CNN+RNN | Kenneth | ~8 GB |
-| ST-GCN | GNN | Munish | ~4 GB |
-| PredRNN | World Model | Munish | ~12 GB |
-| Qwen3.5-9B | VLM (QLoRA) | Munish | ~24 GB |
+| Model | Type | VRAM Est. |
+|-------|------|-----------|
+| TSM | CNN | ~6 GB |
+| R(2+1)D | CNN | ~8 GB |
+| SlowFast | CNN | ~10 GB |
+| TimeSformer | Transformer | ~16 GB |
+| VideoMAE | Transformer | ~18 GB |
+| VideoMamba | SSM | ~10 GB |
+| CNN+ConvLSTM | CNN+RNN | ~8 GB |
+| ST-GCN | GNN | ~4 GB |
+| PredRNN | World Model | ~12 GB |
+| Qwen3.5-9B | VLM (QLoRA) | ~24 GB |
 
 ## Setup
 
@@ -171,16 +171,16 @@ python -m shared.evaluate \
 │   ├── dataset.py           # SSv2 Dataset + DataLoader
 │   └── evaluate.py          # Metrics + result serialization
 ├── models/
-│   ├── tsm/                 # Ayaan
-│   ├── r2plus1d/            # Ayaan
-│   ├── slowfast/            # Aiden
-│   ├── timesformer/         # Aiden
-│   ├── videomae/            # Aiden
-│   ├── videomamba/          # Kenneth
-│   ├── cnn_convlstm/        # Kenneth
-│   ├── stgcn/               # Munish
-│   ├── predrnn/             # Munish
-│   └── qwen/                # Munish
+│   ├── tsm/
+│   ├── r2plus1d/
+│   ├── slowfast/
+│   ├── timesformer/
+│   ├── videomae/
+│   ├── videomamba/
+│   ├── cnn_convlstm/
+│   ├── stgcn/
+│   ├── predrnn/
+│   └── qwen/
 ├── results/                 # Eval outputs (*_results.json + *_confusion_matrix.npy)
 ├── configs/
 │   └── default.yaml         # Shared defaults
@@ -190,8 +190,8 @@ python -m shared.evaluate \
 
 ## Team
 
-- **Munish** — Shared infrastructure, ST-GCN, PredRNN, Qwen3.5-9B
-- **Ayaan** — TSM, R(2+1)D
-- **Aiden** — TimeSformer, VideoMAE, SlowFast
-- **Kenneth** — VideoMamba, CNN+ConvLSTM
-- **Arthur** — Documentation, presentation, final report
+- **Munish Persaud** — [munishbp.com](https://munishbp.com)
+- **Ayaan** —
+- **Aiden** —
+- **Kenneth** —
+- **Arthur** —
