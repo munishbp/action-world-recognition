@@ -1,0 +1,15 @@
+# SSv2 clip ids that failed decord+OpenCV or were missing on disk.
+# One id per line (written as failures are found). Use with:
+#   python models/TSM/train.py --decode-blacklist <this file>
+52
+64
+140
+155
+171
+180
+196
+218
+235
+343
+399
+411
