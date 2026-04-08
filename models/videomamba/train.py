@@ -40,7 +40,7 @@ RESULTS_DIR    = os.path.join(_PROJECT_ROOT, "results")
 NUM_CLASSES    = 174
 
 
-def train_one_epoch(model, loader, criterion, optimizer, scaler, device, max_batches=None):
+def train_one_epoch(model, loader, criterion, optimizer, scaler, device, use_fp16=True, max_batches=None):
     model.train()
     total_loss = 0.0
     correct    = 0
@@ -73,7 +73,7 @@ def train_one_epoch(model, loader, criterion, optimizer, scaler, device, max_bat
 
 
 @torch.no_grad()
-def validate(model, loader, criterion, device, max_batches=None):
+def validate(model, loader, criterion, device, use_fp16=True, max_batches=None):
     model.eval()
     total_loss = 0.0
     correct    = 0
@@ -206,11 +206,11 @@ def main():
 
         train_loss, train_acc = train_one_epoch(
             model, train_loader, criterion, optimizer, scaler, device,
-            max_batches=smoke_batches,
+            use_fp16=use_fp16, max_batches=smoke_batches,
         )
         val_loss, val_acc, val_logits, val_labels = validate(
             model, val_loader, criterion, device,
-            max_batches=smoke_batches,
+            use_fp16=use_fp16, max_batches=smoke_batches,
         )
         scheduler.step()
 
@@ -266,7 +266,7 @@ def main():
         print("  best.pt not found, using last.pt")
     best_ckpt = torch.load(best_path, map_location=device, weights_only=False)
     model.load_state_dict(best_ckpt["model_state_dict"])
-    _, _, final_logits, final_labels = validate(model, val_loader, criterion, device)
+    _, _, final_logits, final_labels = validate(model, val_loader, criterion, device, use_fp16=use_fp16)
 
     results = evaluate_model(
         final_logits.numpy(),
