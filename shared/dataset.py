@@ -232,7 +232,7 @@ class SomethingSomethingV2Dataset(Dataset):
 
         # Attempt 1: decord (fast batch reading)
         try:
-            vr = VideoReader(video_path, ctx=cpu(0))
+            vr = VideoReader(video_path, ctx=cpu(0), num_threads=1)
             total_frames = len(vr)
             indices = _sample_frame_indices(total_frames, self.num_frames)
             frames_np = vr.get_batch(indices).asnumpy()
