@@ -31,7 +31,6 @@ from tqdm import tqdm
 _SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.abspath(os.path.join(_SCRIPT_DIR, "..", ".."))
 sys.path.insert(0, _PROJECT_ROOT)
-sys.path.insert(0, _SCRIPT_DIR)
 
 from shared import evaluate_model, get_dataloader, save_results
 from models.videomamba.models.videomamba import videomamba_tiny, videomamba_small

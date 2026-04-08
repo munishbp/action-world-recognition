@@ -42,15 +42,18 @@ echo "=== [2/6] Installing mamba-ssm (pre-built wheel) ==="
 # Pre-built wheel: torch2.7, Python 3.11, cxx11abiTRUE, Linux x86_64
 WHEEL_URL="https://github.com/state-spaces/mamba/releases/download/v2.3.1/mamba_ssm-2.3.1+cu11torch2.7cxx11abiTRUE-cp311-cp311-linux_x86_64.whl"
 pip install --quiet "$WHEEL_URL"
+# The wheel was built against CUDA 11 so it needs libcudart.so.11.0 at runtime
+pip install --quiet nvidia-cuda-runtime-cu11
 echo "mamba-ssm installed."
 
-# ── 3. Fix VideoMamba __init__.py ─────────────────────────────────────────────
+# ── 3. Fix VideoMamba __init__.py files ──────────────────────────────────────
 echo ""
 echo "=== [3/6] Fixing VideoMamba __init__.py ==="
 
-INIT_PATH="$REPO_ROOT/models/videomamba/models/__init__.py"
-echo "# Minimal init for class project" > "$INIT_PATH"
-echo "Fixed: $INIT_PATH"
+touch "$REPO_ROOT/models/__init__.py"
+touch "$REPO_ROOT/models/videomamba/__init__.py"
+echo "# Minimal init for class project" > "$REPO_ROOT/models/videomamba/models/__init__.py"
+echo "Fixed __init__.py files."
 
 # ── 4. Verify imports ─────────────────────────────────────────────────────────
 echo ""
