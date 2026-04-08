@@ -31,7 +31,7 @@ pip install --quiet numpy
 # (mini image has no nvcc so we can't build from source; latest wheel is torch2.7)
 pip install --quiet torch==2.7.0 torchvision --index-url https://download.pytorch.org/whl/cu126
 pip install --quiet -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu126
-pip install --quiet timm einops huggingface_hub "datasets==2.14.6"
+pip install --quiet timm einops huggingface_hub triton
 
 echo "Dependencies installed."
 
