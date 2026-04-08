@@ -80,7 +80,7 @@ def download_videos():
             print(f"  [skip] {filename} already downloaded")
             continue
         print(f"\nDownloading {filename}...")
-        gdown.download(id=file_id, output=str(out_path), quiet=False)
+        gdown.download(id=file_id, output=str(out_path), quiet=False, use_cookies=True)
 
     import subprocess
 
