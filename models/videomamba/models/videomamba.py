@@ -401,12 +401,12 @@ def load_state_dict(model, state_dict, center=True):
 @register_model
 def videomamba_tiny(pretrained=False, **kwargs):
     model = VisionMamba(
-        patch_size=16, 
-        embed_dim=192, 
-        depth=24, 
-        rms_norm=True, 
-        residual_in_fp32=True, 
-        fused_add_norm=True, 
+        patch_size=16,
+        embed_dim=192,
+        depth=24,
+        rms_norm=False,
+        residual_in_fp32=True,
+        fused_add_norm=False,
         **kwargs
     )
     model.default_cfg = _cfg()
