@@ -1,8 +1,16 @@
 # Data (too large for git)
 data/
+Assignments
 
 # Results (generated)
 results/*.npy
+
+# Checkpoints (too large for git)
+*.pt
+*.task
+
+# Logs
+*.log
 
 # Python
 __pycache__/
