@@ -7,27 +7,21 @@ Usage:
 What this does:
     1. Creates data/something-something-v2/annotations/ and copies annotation
        files from labels/ with the filenames the data loader expects.
-    2. Downloads ~20GB of video archives from HuggingFace
-       (HuggingFaceM4/something_something_v2) and extracts .webm files.
+    2. Downloads videos from HuggingFace using the datasets library and saves
+       them as individual .webm files on disk.
 
 Requirements:
-    pip install huggingface_hub
+    pip install huggingface_hub datasets
 """
 
 import shutil
-import tarfile
 from pathlib import Path
-
-# ── Paths ────────────────────────────────────────────────────────────────────
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 LABELS_DIR   = PROJECT_ROOT / "labels"
 DATA_DIR     = PROJECT_ROOT / "data" / "something-something-v2"
 ANNOT_DIR    = DATA_DIR / "annotations"
 
-HF_REPO_ID = "HuggingFaceM4/something_something_v2"  # note: underscores
-
-# Mapping: source file in labels/ → expected filename in annotations/
 ANNOTATION_FILES = {
     "train.json":      "something-something-v2-train.json",
     "validation.json": "something-something-v2-validation.json",
@@ -35,7 +29,6 @@ ANNOTATION_FILES = {
     "labels.json":     "something-something-v2-labels.json",
 }
 
-# ── Step 1: Set up annotations ───────────────────────────────────────────────
 
 def setup_annotations():
     ANNOT_DIR.mkdir(parents=True, exist_ok=True)
@@ -51,54 +44,59 @@ def setup_annotations():
         shutil.copy2(src, dst)
         print(f"  [ok]   {src_name} → annotations/{dst_name}")
 
-# ── Step 2: Download + extract videos from HuggingFace ───────────────────────
 
 def download_videos():
     try:
-        from huggingface_hub import snapshot_download
+        from datasets import load_dataset
     except ImportError:
-        print("\n[error] huggingface_hub not installed.")
-        print("  Run: pip install huggingface_hub")
+        print("\n[error] datasets not installed. Run: pip install datasets")
         return
 
-    print(f"\nDownloading video archives from HuggingFace ({HF_REPO_ID})...")
-    print("Dataset size: ~20GB — this will take a while on slow connections.")
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Download only .tgz archive files (videos are packed in ~20 x 1GB tarballs)
-    download_dir = DATA_DIR / "_archives"
-    snapshot_download(
-        repo_id=HF_REPO_ID,
-        repo_type="dataset",
-        local_dir=str(download_dir),
-        allow_patterns=["*.tgz"],
-    )
+    for split in ["train", "validation", "test"]:
+        print(f"\nDownloading {split} split...")
+        ds = load_dataset(
+            "HuggingFaceM4/something_something_v2",
+            split=split,
+            streaming=False,
+        )
 
-    # Extract all tarballs into DATA_DIR (videos land as <id>.webm)
-    archives = sorted(download_dir.glob("*.tgz"))
-    if not archives:
-        print("[warn] No .tgz files found after download — check HuggingFace repo structure.")
-        return
+        existing = set(p.stem for p in DATA_DIR.glob("*.webm"))
+        to_download = [ex for ex in ds if str(ex["video_id"]) not in existing]
+        print(f"  {len(existing)} already on disk, {len(to_download)} to download")
 
-    print(f"\nExtracting {len(archives)} archive(s)...")
-    for archive in archives:
-        print(f"  extracting {archive.name}...")
-        with tarfile.open(archive, "r:gz") as tar:
-            tar.extractall(path=DATA_DIR)
+        for i, example in enumerate(to_download):
+            video_id  = str(example["video_id"])
+            video_obj = example["video"]
 
-    print(f"\nCleaning up archives...")
-    shutil.rmtree(download_dir)
-    print("Done.")
+            out_path = DATA_DIR / f"{video_id}.webm"
 
-# ── Main ─────────────────────────────────────────────────────────────────────
+            # video field may be a file path or a dict with 'bytes'
+            if isinstance(video_obj, dict) and "bytes" in video_obj and video_obj["bytes"]:
+                out_path.write_bytes(video_obj["bytes"])
+            elif isinstance(video_obj, dict) and "path" in video_obj and video_obj["path"]:
+                shutil.copy2(video_obj["path"], out_path)
+            elif hasattr(video_obj, "read"):
+                out_path.write_bytes(video_obj.read())
+            else:
+                print(f"  [warn] unknown video format for {video_id}: {type(video_obj)}")
+                continue
+
+            if (i + 1) % 5000 == 0:
+                print(f"  {i + 1}/{len(to_download)} saved...")
+
+        print(f"  {split} done.")
+
 
 if __name__ == "__main__":
     print("=== Step 1: Setting up annotations ===")
     setup_annotations()
 
-    print("\n=== Step 2: Downloading and extracting videos ===")
+    print("\n=== Step 2: Downloading videos ===")
     download_videos()
 
     print("\n=== Done ===")
     webm_count = len(list(DATA_DIR.glob("*.webm")))
-    print(f"Videos in data dir: {webm_count}")
-    print(f"Expected: ~220,847 total across train/val/test")
+    print(f"Videos on disk: {webm_count:,}")
+    print(f"Expected:       ~220,847")
