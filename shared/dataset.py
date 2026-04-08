@@ -187,6 +187,7 @@ class SomethingSomethingV2Dataset(Dataset):
         frame_size: int = 224,
         root: str = DEFAULT_ROOT,
         annotations_dir: str | None = None,
+        videos_dir: str | None = None,
         transform: transforms.Compose | None = None,
     ):
         self.split = split
@@ -199,8 +200,12 @@ class SomethingSomethingV2Dataset(Dataset):
         self.samples = _load_split(self.annotations_dir, split)
         self.label_map = _load_labels(self.annotations_dir)
 
-        # Videos directory
-        self.videos_dir = root
+        # Videos directory — auto-detect subfolder if not specified
+        if videos_dir is not None:
+            self.videos_dir = videos_dir
+        else:
+            subfolder = os.path.join(root, "20bn-something-something-v2")
+            self.videos_dir = subfolder if os.path.isdir(subfolder) else root
 
         # Split-aware transforms (or custom override)
         if transform is not None:
@@ -286,6 +291,7 @@ def get_dataloader(
     pin_memory: bool = True,
     root: str = DEFAULT_ROOT,
     annotations_dir: str | None = None,
+    videos_dir: str | None = None,
     transform: transforms.Compose | None = None,
 ) -> DataLoader:
     """Create a DataLoader for Something-Something V2.
@@ -324,6 +330,7 @@ def get_dataloader(
         frame_size=frame_size,
         root=root,
         annotations_dir=annotations_dir,
+        videos_dir=videos_dir,
         transform=transform,
     )
 
