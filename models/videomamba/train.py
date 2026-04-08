@@ -128,6 +128,9 @@ def main():
     parser.add_argument("--smoke-test",  action="store_true",          help="Run 2 train + 2 val batches for 1 epoch to verify pipeline")
     args = parser.parse_args()
 
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+
     device   = torch.device(args.device)
     use_fp16 = not args.no_fp16 and device.type == "cuda"
     print(f"Device:  {device}  |  fp16: {use_fp16}")

@@ -21,8 +21,8 @@ DATA_ROOT = os.path.join(_PROJECT_ROOT, "data", "something-something-v2")
 NUM_FRAMES = 16
 NUM_BATCHES = 50  # batches per config
 
-BATCH_SIZES   = [16, 32, 64]
-WORKER_COUNTS = [4, 8, 16]
+BATCH_SIZES   = [32, 64, 128]
+WORKER_COUNTS = [8, 16, 32]
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
