@@ -111,10 +111,10 @@ def create_block(
     device=None,
     dtype=None,
 ):
-    factory_kwargs = {"device": device, "dtype": dtype}
+    factory_kwargs = {k: v for k, v in {"device": device, "dtype": dtype}.items() if v is not None}
     if ssm_cfg is None:
         ssm_cfg = {}
-    mixer_cls = partial(Mamba, layer_idx=layer_idx, bimamba=bimamba, **ssm_cfg, **factory_kwargs)
+    mixer_cls = partial(Mamba, layer_idx=layer_idx, **ssm_cfg, **factory_kwargs)
     norm_cls = partial(nn.LayerNorm if not rms_norm else RMSNorm, eps=norm_epsilon)
     block = Block(
         d_model,
@@ -223,7 +223,7 @@ class VisionMamba(nn.Module):
             use_checkpoint=False,
             checkpoint_num=0,
         ):
-        factory_kwargs = {"device": device, "dtype": dtype} # follow MambaLMHeadModel
+        factory_kwargs = {k: v for k, v in {"device": device, "dtype": dtype}.items() if v is not None}
         super().__init__()
         self.residual_in_fp32 = residual_in_fp32
         self.fused_add_norm = fused_add_norm
@@ -274,7 +274,8 @@ class VisionMamba(nn.Module):
         )
         
         # output head
-        self.norm_f = (nn.LayerNorm if not rms_norm else RMSNorm)(embed_dim, eps=norm_epsilon, **factory_kwargs)
+        norm_factory_kwargs = {k: v for k, v in factory_kwargs.items() if v is not None}
+        self.norm_f = (nn.LayerNorm if not rms_norm else RMSNorm)(embed_dim, eps=norm_epsilon, **norm_factory_kwargs)
 
         # original init
         self.apply(segm_init_weights)
@@ -420,12 +421,12 @@ def videomamba_tiny(pretrained=False, **kwargs):
 @register_model
 def videomamba_small(pretrained=False, **kwargs):
     model = VisionMamba(
-        patch_size=16, 
-        embed_dim=384, 
-        depth=24, 
-        rms_norm=True, 
-        residual_in_fp32=True, 
-        fused_add_norm=True, 
+        patch_size=16,
+        embed_dim=384,
+        depth=24,
+        rms_norm=False,
+        residual_in_fp32=True,
+        fused_add_norm=False,
         **kwargs
     )
     model.default_cfg = _cfg()
