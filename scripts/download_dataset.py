@@ -84,14 +84,10 @@ def download_videos():
 
     import subprocess
 
-    # Unzip parts into zip_dir (produces raw tar parts, not webm files)
-    print("\nUnzipping...")
-    subprocess.run("unzip -o '*.zip'", shell=True, cwd=str(zip_dir), check=True)
-
-    # Concatenate tar parts and extract into DATA_DIR
+    # Files are raw tar parts (despite .zip extension) — cat and extract directly
     print("\nExtracting videos (this will take a while)...")
     subprocess.run(
-        f"cat 20bn-something-something-v2-?? | tar -xvzf - -C '{DATA_DIR}'",
+        f"cat 20bn-something-something-v2-??.zip | tar -xvzf - -C '{DATA_DIR}'",
         shell=True, cwd=str(zip_dir), check=True
     )
 
