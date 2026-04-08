@@ -155,7 +155,7 @@ def main():
 
     print(f"Building VideoMamba-{args.model.capitalize()}...")
     build_fn = videomamba_tiny if args.model == "tiny" else videomamba_small
-    model = build_fn(num_classes=NUM_CLASSES, num_frames=args.num_frames).to(device)
+    model = build_fn(num_classes=NUM_CLASSES, num_frames=args.num_frames, rms_norm=False).to(device)
 
     total_params     = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
