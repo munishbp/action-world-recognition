@@ -60,6 +60,7 @@ def download_videos():
             "HuggingFaceM4/something_something_v2",
             split=split,
             streaming=False,
+            trust_remote_code=True,
         )
 
         existing = set(p.stem for p in DATA_DIR.glob("*.webm"))
