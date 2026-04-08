@@ -31,7 +31,7 @@ pip install --quiet numpy
 # (mini image has no nvcc so we can't build from source; latest wheel is torch2.7)
 pip install --quiet torch==2.7.0 torchvision --index-url https://download.pytorch.org/whl/cu126
 pip install --quiet -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu126
-pip install --quiet timm einops huggingface_hub triton
+pip install --quiet timm einops huggingface_hub triton gdown
 
 echo "Dependencies installed."
 
@@ -44,6 +44,12 @@ WHEEL_URL="https://github.com/state-spaces/mamba/releases/download/v2.3.1/mamba_
 pip install --quiet "$WHEEL_URL"
 # The wheel was built against CUDA 11 so it needs libcudart.so.11.0 at runtime
 pip install --quiet nvidia-cuda-runtime-cu11
+
+# Add the CUDA 11 runtime lib to LD_LIBRARY_PATH so the linker can find it
+CUDA_RT_LIB=$(python -c "import os, nvidia.cuda_runtime; print(os.path.join(os.path.dirname(nvidia.cuda_runtime.__file__), 'lib'))")
+export LD_LIBRARY_PATH="$CUDA_RT_LIB:$LD_LIBRARY_PATH"
+# Persist for future shell sessions
+echo "export LD_LIBRARY_PATH=\"$CUDA_RT_LIB:\$LD_LIBRARY_PATH\"" >> ~/.bashrc
 echo "mamba-ssm installed."
 
 # ── 3. Fix VideoMamba __init__.py files ──────────────────────────────────────

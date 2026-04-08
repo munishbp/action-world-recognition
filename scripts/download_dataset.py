@@ -46,48 +46,69 @@ def setup_annotations():
 
 
 def download_videos():
+    """
+    Downloads SSv2 video zips from Google Drive using gdown, then extracts them.
+    Requires: pip install gdown
+    """
     try:
-        from datasets import load_dataset
+        import gdown
     except ImportError:
-        print("\n[error] datasets not installed. Run: pip install datasets")
+        print("\n[error] gdown not installed. Run: pip install gdown")
         return
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    for split in ["train", "validation", "test"]:
-        print(f"\nDownloading {split} split...")
-        ds = load_dataset(
-            "HuggingFaceM4/something_something_v2",
-            split=split,
-            streaming=False,
-            trust_remote_code=True,
-        )
+    # Check if already extracted
+    webm_count = len(list(DATA_DIR.glob("*.webm")))
+    if webm_count > 0:
+        print(f"  Found {webm_count:,} videos already on disk — skipping download.")
+        return
 
-        existing = set(p.stem for p in DATA_DIR.glob("*.webm"))
-        to_download = [ex for ex in ds if str(ex["video_id"]) not in existing]
-        print(f"  {len(existing)} already on disk, {len(to_download)} to download")
+    # Google Drive file IDs for the two video zips
+    zip_files = [
+        ("1b54Mbh0MsU4v-Tq29-gfT-I-9WEtWIAv", "20bn-something-something-v2-00.zip"),
+        ("1WvpvfB6wiro925IirMj3hiPC32lkWISm",  "20bn-something-something-v2-01.zip"),
+    ]
 
-        for i, example in enumerate(to_download):
-            video_id  = str(example["video_id"])
-            video_obj = example["video"]
+    zip_dir = DATA_DIR / "_zips"
+    zip_dir.mkdir(parents=True, exist_ok=True)
 
-            out_path = DATA_DIR / f"{video_id}.webm"
+    # Download
+    for file_id, filename in zip_files:
+        out_path = zip_dir / filename
+        if out_path.exists():
+            print(f"  [skip] {filename} already downloaded")
+            continue
+        print(f"\nDownloading {filename}...")
+        gdown.download(id=file_id, output=str(out_path), quiet=False)
 
-            # video field may be a file path or a dict with 'bytes'
-            if isinstance(video_obj, dict) and "bytes" in video_obj and video_obj["bytes"]:
-                out_path.write_bytes(video_obj["bytes"])
-            elif isinstance(video_obj, dict) and "path" in video_obj and video_obj["path"]:
-                shutil.copy2(video_obj["path"], out_path)
-            elif hasattr(video_obj, "read"):
-                out_path.write_bytes(video_obj.read())
-            else:
-                print(f"  [warn] unknown video format for {video_id}: {type(video_obj)}")
-                continue
+    import subprocess
 
-            if (i + 1) % 5000 == 0:
-                print(f"  {i + 1}/{len(to_download)} saved...")
+    # Unzip parts into zip_dir (produces raw tar parts, not webm files)
+    print("\nUnzipping...")
+    subprocess.run("unzip -o '*.zip'", shell=True, cwd=str(zip_dir), check=True)
 
-        print(f"  {split} done.")
+    # Concatenate tar parts and extract into DATA_DIR
+    print("\nExtracting videos (this will take a while)...")
+    subprocess.run(
+        f"cat 20bn-something-something-v2-?? | tar -xvzf - -C '{DATA_DIR}'",
+        shell=True, cwd=str(zip_dir), check=True
+    )
+
+    # Tar may have extracted into a subfolder — move files up if needed
+    subdir = DATA_DIR / "20bn-something-something-v2"
+    if subdir.exists() and subdir.is_dir():
+        print("\nMoving videos from subfolder to data root...")
+        for f in subdir.iterdir():
+            f.rename(DATA_DIR / f.name)
+        subdir.rmdir()
+
+    # Cleanup zips
+    print("\nCleaning up zips...")
+    shutil.rmtree(zip_dir)
+
+    webm_count = len(list(DATA_DIR.glob("*.webm")))
+    print(f"  Done. {webm_count:,} videos extracted.")
 
 
 if __name__ == "__main__":
