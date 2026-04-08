@@ -170,7 +170,7 @@ def main():
     print(f"LR: cosine {args.lr:.1e} → {eta_min:.1e} over {args.epochs} epochs")
 
     start_epoch  = 0
-    best_val_acc = 0.0
+    best_val_acc = -1.0
 
     if args.resume and os.path.isfile(args.resume):
         ckpt = torch.load(args.resume, map_location=device, weights_only=False)
@@ -260,7 +260,11 @@ def main():
     print(f"  Peak VRAM:    {peak_vram:.2f} GB")
 
     print("\nFinal evaluation (best checkpoint)...")
-    best_ckpt = torch.load(os.path.join(CHECKPOINT_DIR, "best.pt"), map_location=device, weights_only=False)
+    best_path = os.path.join(CHECKPOINT_DIR, "best.pt")
+    if not os.path.isfile(best_path):
+        best_path = os.path.join(CHECKPOINT_DIR, "last.pt")
+        print("  best.pt not found, using last.pt")
+    best_ckpt = torch.load(best_path, map_location=device, weights_only=False)
     model.load_state_dict(best_ckpt["model_state_dict"])
     _, _, final_logits, final_labels = validate(model, val_loader, criterion, device)
 
