@@ -25,7 +25,7 @@ import torch
 import torch.nn as nn
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.cuda.amp import GradScaler, autocast
+from torch.amp import GradScaler, autocast
 from tqdm import tqdm
 
 _SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
@@ -57,7 +57,7 @@ def train_one_epoch(model, loader, criterion, optimizer, scaler, device, max_bat
         labels = labels.to(device, non_blocking=True)
 
         optimizer.zero_grad()
-        with autocast():
+        with autocast("cuda", dtype=torch.bfloat16, enabled=use_fp16):
             logits = model(frames)
             loss   = criterion(logits, labels)
 
@@ -90,7 +90,7 @@ def validate(model, loader, criterion, device, max_batches=None):
         frames = frames.permute(0, 2, 1, 3, 4).to(device, non_blocking=True)
         labels = labels.to(device, non_blocking=True)
 
-        with autocast():
+        with autocast("cuda", dtype=torch.bfloat16, enabled=use_fp16):
             logits = model(frames)
             loss   = criterion(logits, labels)
 
@@ -165,7 +165,7 @@ def main():
     eta_min   = args.lr_min if args.lr_min is not None else args.lr * 0.01
     scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=eta_min)
     criterion = nn.CrossEntropyLoss()
-    scaler    = GradScaler(enabled=use_fp16)
+    scaler    = GradScaler("cuda", enabled=use_fp16)
 
     print(f"LR: cosine {args.lr:.1e} → {eta_min:.1e} over {args.epochs} epochs")
 

@@ -31,7 +31,7 @@ cd "$REPO_ROOT"
 python models/videomamba/train.py \
     --model tiny \
     --epochs 30 \
-    --batch-size 32 \
+    --batch-size 16 \
     --lr 1e-4 \
     --num-frames 16 \
     --num-workers 8 \
