@@ -28,6 +28,11 @@ set -e
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
+# Activate venv if python not in PATH
+if ! command -v python &>/dev/null; then
+    source /venv/main/bin/activate
+fi
+
 python models/videomamba/train.py \
     --model tiny \
     --epochs 30 \
