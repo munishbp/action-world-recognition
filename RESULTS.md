@@ -20,7 +20,7 @@ The headline table. This is what goes in the paper.
 | VideoMamba | SSM | Kenneth | | | | | |
 | CNN+ConvLSTM | CNN+RNN | Kenneth | | | | | |
 | ST-GCN | GNN | Munish | 0.0394 | 0.1231 | 0.0192 | 3.1M | 3.1M |
-| PredRNN | World Model | Munish | | | | | |
+| PredRNN | World Model | Munish | 0.0467 | 0.1302 | 0.0164 | 18.6M | 18.6M |
 | Qwen3.5-9B | VLM (QLoRA) | Munish | | | | | |
 | **V-JEPA** | **SOTA baseline** | **Munish** | 0.6451 | -- | -- | 307M | 0 |
 
@@ -42,7 +42,7 @@ How expensive was each model to train. Important for the cost-vs-accuracy analys
 | VideoMamba | | | | 224 | | | |
 | CNN+ConvLSTM | | | | 224 | | | |
 | ST-GCN | 5.5 | 0.86 | 16 | N/A | 64 | 50 | RTX 5090 |
-| PredRNN | | | | 224 | | | |
+| PredRNN | 13.24 | 4.79 | 8 | 224 | 16 | 15 | V100-32GB + RTX 5090 |
 | V-JEPA | N/A (eval only) | 4.3 | 16 | 224 | 4 | 0 | V100-32GB |
 | Qwen3.5-9B | | | | | | | |
 
@@ -98,7 +98,7 @@ After eval, note which classes get confused with each other the most. Look at of
 | VideoMamba | | | |
 | CNN+ConvLSTM | | | |
 | ST-GCN | | | |
-| PredRNN | | | |
+| PredRNN | Something falling like a rock -> Moving something down | 95 | Semantically sensible, falling is a kind of moving down |
 | Qwen3.5-9B | | | |
 
 ---
@@ -196,13 +196,15 @@ Fill in anything notable about your model -- what worked, what didn't, any surpr
 - Failure modes: None from the model itself. The gap is purely environmental (FP16 autocast, decord threading workaround). On an A100 + BF16 the published 69.5% should reproduce exactly. This is a ceiling number for what pretrained SSL can do on SSv2 without any task-specific training.
 
 ### PredRNN (Munish)
-- Pretrained from:
-- Fine-tuning strategy:
-- Optimizer / LR / Schedule:
-- Best val epoch:
-- What worked:
-- What didn't:
-- Failure modes:
+- Pretrained from: trained from scratch
+- Fine-tuning strategy: full training, 15 epochs total. First 6 epochs on local RTX 5090, then resumed from `last.pt` on Vast.ai V100-32GB for epochs 7-15 (F: drive I/O contention with another job was starving the 5090 dataloader). Resume worked cleanly via cosine scheduler state.
+- Optimizer / LR / Schedule: Adam, LR 1e-3, weight_decay 1e-4, CosineAnnealingLR T_max=15, grad clip 1.0
+- Input: 8 frames/clip, 224 resolution, decord decoded on the fly (no frame cache on Vast). Batch size 16 train, 32 val.
+- Architecture: CNN encoder (32->64->64 channels, 3x downsample to 28x28) + 4 stacked ST-LSTM layers (64,64,128,128 hidden) with PredRNN spatial memory M (128 dim), dropout 0.3, 18.6M params (all trainable)
+- Best val epoch: 15 (final, val acc 0.0467). Every epoch from 7 to 15 on the resumed run wrote a new `best.pt`. The cosine LR decay was clearly doing work late in training.
+- What worked: Resuming from a partial run just worked. The scheduler T_max=15 state preserved correctly through the checkpoint. Going from 1.13% val acc at epoch 6 to 4.67% at epoch 15 is a 4x improvement that the original plan warning (stuck near baseline) did not predict. Spatial memory helps PredRNN pick up camera-direction and fall-direction classes much better than skeleton-only ST-GCN.
+- What didn't: 4.67% top-1 on 174 classes is still far from usable. Roughly 70% of classes get 0% accuracy. PredRNN's spatiotemporal world model picks up global motion patterns but not the fine-grained hand-object interactions that dominate SSv2 (e.g. attaching something to something, bending something so that it deforms). 8 frames per clip is probably also too few to resolve fast manipulations.
+- Failure modes: The model learns a handful of motion-heavy classes (30-52% accuracy on classes 94, 109, 43, 93, 146, all camera-direction and surface-placement actions) and gets 0% on everything else. Top confused pair is Something falling like a rock -> Moving something down (95 confusions), which is semantically correct because falling is a kind of moving down. Similar for Tearing something into two pieces -> Moving something down (91). PredRNN is predicting the motion correctly but not the physical transformation.
 
 ### Qwen3.5-9B (Munish)
 - Pretrained from:
