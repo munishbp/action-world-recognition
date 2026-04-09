@@ -31,6 +31,7 @@ git config user.name "Vast.ai Training"
 git add results/
 git add models/videomamba/checkpoints/metrics.csv
 git add models/videomamba/checkpoints/best.pt 2>/dev/null || echo "  best.pt too large for git, skipping"
+git add models/videomamba/checkpoints/last.pt 2>/dev/null || echo "  last.pt too large for git, skipping"
 
 git commit -m "Training results: $(date '+%Y-%m-%d %H:%M')" || echo "  Nothing new to commit"
 git pull --rebase || echo "  Git pull --rebase failed — check for conflicts"
