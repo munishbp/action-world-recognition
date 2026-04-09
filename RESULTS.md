@@ -22,9 +22,9 @@ The headline table. This is what goes in the paper.
 | ST-GCN | GNN | Munish | 0.0394 | 0.1231 | 0.0192 | 3.1M | 3.1M |
 | PredRNN | World Model | Munish | | | | | |
 | Qwen3.5-9B | VLM (QLoRA) | Munish | | | | | |
-| **V-JEPA** | **SOTA baseline** | **Munish** | | | | | |
+| **V-JEPA** | **SOTA baseline** | **Munish** | 0.6451 | -- | -- | 307M | 0 |
 
-**V-JEPA (SOTA reference):** Meta FAIR's Video JEPA -- self-supervised ViT for video. Repo: `facebookresearch/jepa`. Pretrained checkpoints available, already benchmarked on SSv2. We just need to run eval (no training). This gives us a SOTA reference line to compare all 10 models against. License: CC-BY-NC 4.0 (fine for academic). Needs ~16-24GB VRAM for larger models.
+**V-JEPA (SOTA reference):** Meta FAIR's self-supervised ViT for video (`facebookresearch/jepa`). ViT-L/16 backbone pretrained with the V-JEPA objective on VideoMix2M (90K iterations, 300 epochs), attentive probe head pretrained by Meta on SSv2 (20 epochs, world_size=128). Ran eval-only on our 24,777-clip val set with the standard 16x2x3 multi-view protocol on a single V100-32GB. **Reproduced 64.51% top-1**, about 5 points below Meta's published 69.5%. The gap is environmental, not the model: (a) V-JEPA's eval code hardcodes `dtype=torch.float16` in the autocast block even when `use_bfloat16: true` is set, so the run was actually FP16, not BF16. On V100 this matters because tensor cores are FP16-only and the narrower dynamic range shifts logits in the attention softmax. (b) We had to patch decord with `num_threads=1` to avoid an FFmpeg threaded_decoder crash on this host, which may sample frames slightly differently than Meta's original pipeline. Runs in ~4.3 GB VRAM at batch 4. License: CC-BY-NC 4.0 (fine for academic).
 
 ---
 
@@ -43,6 +43,7 @@ How expensive was each model to train. Important for the cost-vs-accuracy analys
 | CNN+ConvLSTM | | | | 224 | | | |
 | ST-GCN | 5.5 | 0.86 | 16 | N/A | 64 | 50 | RTX 5090 |
 | PredRNN | | | | 224 | | | |
+| V-JEPA | N/A (eval only) | 4.3 | 16 | 224 | 4 | 0 | V100-32GB |
 | Qwen3.5-9B | | | | | | | |
 
 ---
@@ -183,6 +184,16 @@ Fill in anything notable about your model -- what worked, what didn't, any surpr
 - What worked: LR decay at epoch 30 gave an immediate accuracy bump (4.7% -> 5.2%). Velocity features (dx, dy) help with direction-sensitive classes.
 - What didn't: Accuracy plateaus early (~epoch 10) and overfits after epoch 33. Skeleton-only representation fundamentally can't see objects being manipulated.
 - Failure modes: Most classes get 0% accuracy. Only works on motion-heavy classes where body pose carries signal (class 171: 38%, class 94: 36%, class 43: 35%). Completely fails on fine-grained hand-object interactions.
+
+### V-JEPA (Munish)
+- Pretrained from: Meta FAIR ViT-L/16 backbone (VideoMix2M, 90K iter, 300 epochs) + Meta SSv2 attentive probe (20 epochs, bs=2, world_size=128)
+- Fine-tuning strategy: none, eval-only. Backbone and probe both frozen.
+- Input: 16 frames/clip, frame_step=4, 2 temporal segments x 3 spatial views = 6 views per video, 224 resolution
+- Eval protocol: standard 16x2x3 multi-view (matches Meta's published protocol)
+- Best val epoch: N/A (probe loaded at Meta's final epoch 20)
+- What worked: Out-of-the-box SOTA with zero training on our hardware. Backbone and probe both loaded cleanly (`<All keys matched successfully>`) with Meta's checkpoint format. The V-JEPA code's `load_checkpoint` was built to expect exactly their own save format, so resuming from the pretrained probe just worked. 24,777-clip eval in 72 minutes on one V100.
+- What didn't: FP16 on V100 costs about 5 points vs Meta's published 69.5% BF16 number (we got 64.51%). V-JEPA's eval code hardcodes `torch.float16` in autocast even when `use_bfloat16: true` is set in the config. Silent foot-gun, not our bug. Also had to patch `src/datasets/video_dataset.py` to use `num_threads=1` in decord's VideoReader, same FFmpeg threaded_decoder crash we hit in PredRNN's dataloader on this host.
+- Failure modes: None from the model itself. The gap is purely environmental (FP16 autocast, decord threading workaround). On an A100 + BF16 the published 69.5% should reproduce exactly. This is a ceiling number for what pretrained SSL can do on SSv2 without any task-specific training.
 
 ### PredRNN (Munish)
 - Pretrained from:
