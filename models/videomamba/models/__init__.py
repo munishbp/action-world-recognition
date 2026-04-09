@@ -1,1 +1,1 @@
-# Minimal init for class
+# Minimal init for class project
