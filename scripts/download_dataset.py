@@ -58,12 +58,6 @@ def download_videos():
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Check if already extracted
-    webm_count = len(list(DATA_DIR.glob("*.webm")))
-    if webm_count > 0:
-        print(f"  Found {webm_count:,} videos already on disk — skipping download.")
-        return
-
     # Google Drive file IDs for the two video zips
     zip_files = [
         ("1b54Mbh0MsU4v-Tq29-gfT-I-9WEtWIAv", "20bn-something-something-v2-00.zip"),
@@ -71,16 +65,27 @@ def download_videos():
     ]
 
     zip_dir = DATA_DIR / "_zips"
+
+    # Check if already extracted
+    webm_count = len(list(DATA_DIR.glob("*.webm")))
+    if webm_count > 0:
+        print(f"  Found {webm_count:,} videos already on disk — skipping download and extraction.")
+        return
+
     zip_dir.mkdir(parents=True, exist_ok=True)
 
-    # Download
-    for file_id, filename in zip_files:
-        out_path = zip_dir / filename
-        if out_path.exists():
-            print(f"  [skip] {filename} already downloaded")
-            continue
-        print(f"\nDownloading {filename}...")
-        gdown.download(id=file_id, output=str(out_path), quiet=False, use_cookies=True)
+    # Check which zips are already downloaded
+    all_zips_present = all((zip_dir / filename).exists() for _, filename in zip_files)
+    if all_zips_present:
+        print("  Both zip files already downloaded — skipping download, going straight to extraction.")
+    else:
+        for file_id, filename in zip_files:
+            out_path = zip_dir / filename
+            if out_path.exists():
+                print(f"  [skip] {filename} already downloaded")
+                continue
+            print(f"\nDownloading {filename}...")
+            gdown.download(id=file_id, output=str(out_path), quiet=False, use_cookies=True)
 
     import subprocess
 
