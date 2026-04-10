@@ -23,7 +23,8 @@ echo "=== Repo root: $REPO_ROOT ==="
 echo ""
 echo "=== [1/3] Installing dependencies ==="
 
-pip install --quiet torch==2.7.0 torchvision --index-url https://download.pytorch.org/whl/cu126
+# Use the PyTorch already installed in the image — do not downgrade or reinstall it.
+# (Downgrading to cu126 causes "no kernel image" errors on cu128/cu129 images.)
 pip install --quiet -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu126
 # pytorchvideo (used by torch.hub for SlowFast) requires fvcore and iopath
 pip install --quiet fvcore iopath gdown
