@@ -49,7 +49,7 @@ NUM_CLASSES = 174
 DEFAULT_EPOCHS = 20
 
 # SSv2 archives extract to this subdirectory under data/
-DEFAULT_DATA_ROOT = os.path.join(_PROJECT_ROOT, "data", "20bn-something-something-v2")
+DEFAULT_DATA_ROOT = os.path.join(_PROJECT_ROOT, "data", "something-something-v2")
 # Annotations live in labels/ at the project root (different names from what shared expects)
 _LABELS_DIR = os.path.join(_PROJECT_ROOT, "labels")
 # Shared pipeline expects these exact filenames
