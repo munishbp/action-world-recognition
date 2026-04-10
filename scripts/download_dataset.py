@@ -58,10 +58,10 @@ def download_videos():
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Google Drive file IDs for the two video zips
+    # Google Drive file IDs for the two archive parts
     zip_files = [
-        ("1b54Mbh0MsU4v-Tq29-gfT-I-9WEtWIAv", "20bn-something-something-v2-00.zip"),
-        ("1WvpvfB6wiro925IirMj3hiPC32lkWISm",  "20bn-something-something-v2-01.zip"),
+        ("1b54Mbh0MsU4v-Tq29-gfT-I-9WEtWIAv", "20bn-something-something-v2-00"),
+        ("1WvpvfB6wiro925IirMj3hiPC32lkWISm",  "20bn-something-something-v2-01"),
     ]
 
     zip_dir = DATA_DIR / "_zips"
@@ -74,10 +74,10 @@ def download_videos():
 
     zip_dir.mkdir(parents=True, exist_ok=True)
 
-    # Check which zips are already downloaded
+    # Check which parts are already downloaded
     all_zips_present = all((zip_dir / filename).exists() for _, filename in zip_files)
     if all_zips_present:
-        print("  Both zip files already downloaded — skipping download, going straight to extraction.")
+        print("  Both archive files already downloaded — skipping download, going straight to extraction.")
     else:
         for file_id, filename in zip_files:
             out_path = zip_dir / filename
@@ -89,10 +89,10 @@ def download_videos():
 
     import subprocess
 
-    # Files are raw tar parts (despite .zip extension) — cat and extract directly
+    # Files are raw tar parts — cat and extract directly
     print("\nExtracting videos (this will take a while)...")
     subprocess.run(
-        f"cat 20bn-something-something-v2-??.zip | tar -xvzf - -C '{DATA_DIR}'",
+        f"cat 20bn-something-something-v2-?? | tar -xvzf - -C '{DATA_DIR}'",
         shell=True, cwd=str(zip_dir), check=True
     )
 
