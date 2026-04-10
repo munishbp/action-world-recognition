@@ -65,6 +65,8 @@ def download_videos():
     ]
 
     zip_dir = DATA_DIR / "_zips"
+    # Also check data/ directly (user may have placed files there manually)
+    alt_dir = PROJECT_ROOT / "data"
 
     # Check if already extracted
     webm_count = len(list(DATA_DIR.glob("*.webm")))
@@ -72,20 +74,29 @@ def download_videos():
         print(f"  Found {webm_count:,} videos already on disk — skipping download and extraction.")
         return
 
-    zip_dir.mkdir(parents=True, exist_ok=True)
+    # Resolve where each archive part lives (zip_dir, alt_dir, or needs downloading)
+    def find_part(filename):
+        for d in (zip_dir, alt_dir):
+            p = d / filename
+            if p.exists():
+                return p
+        return None
 
-    # Check which parts are already downloaded
-    all_zips_present = all((zip_dir / filename).exists() for _, filename in zip_files)
-    if all_zips_present:
-        print("  Both archive files already downloaded — skipping download, going straight to extraction.")
+    existing = {filename: find_part(filename) for _, filename in zip_files}
+    all_found = all(p is not None for p in existing.values())
+
+    if all_found:
+        extract_dir = existing[zip_files[0][1]].parent
+        print(f"  Both archive files found in {extract_dir} — skipping download.")
     else:
+        zip_dir.mkdir(parents=True, exist_ok=True)
+        extract_dir = zip_dir
         for file_id, filename in zip_files:
-            out_path = zip_dir / filename
-            if out_path.exists():
-                print(f"  [skip] {filename} already downloaded")
+            if existing[filename] is not None:
+                print(f"  [skip] {filename} already at {existing[filename]}")
                 continue
             print(f"\nDownloading {filename}...")
-            gdown.download(id=file_id, output=str(out_path), quiet=False, use_cookies=True)
+            gdown.download(id=file_id, output=str(zip_dir / filename), quiet=False, use_cookies=True)
 
     import subprocess
 
@@ -93,7 +104,7 @@ def download_videos():
     print("\nExtracting videos (this will take a while)...")
     subprocess.run(
         f"cat 20bn-something-something-v2-?? | tar -xvzf - -C '{DATA_DIR}'",
-        shell=True, cwd=str(zip_dir), check=True
+        shell=True, cwd=str(extract_dir), check=True
     )
 
     # Tar may have extracted into a subfolder — move files up if needed
@@ -104,9 +115,10 @@ def download_videos():
             f.rename(DATA_DIR / f.name)
         subdir.rmdir()
 
-    # Cleanup zips
-    print("\nCleaning up zips...")
-    shutil.rmtree(zip_dir)
+    # Cleanup _zips/ only if we downloaded there (don't delete user-provided files)
+    if extract_dir == zip_dir and zip_dir.exists():
+        print("\nCleaning up zips...")
+        shutil.rmtree(zip_dir)
 
     webm_count = len(list(DATA_DIR.glob("*.webm")))
     print(f"  Done. {webm_count:,} videos extracted.")
