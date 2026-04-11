@@ -15,7 +15,7 @@ Benchmarking 10 video understanding models on [Something-Something V2](https://w
 | CNN+ConvLSTM | CNN+RNN | ~8 GB |
 | ST-GCN | GNN | ~4 GB |
 | PredRNN | World Model | ~12 GB |
-| Qwen3.5-9B | VLM (QLoRA) | ~24 GB |
+| Qwen3.5-4B | VLM (QLoRA) | ~10 GB |
 | V-JEPA (ViT-L) | SOTA Baseline (eval only) | ~10 GB |
 
 ## Setup
