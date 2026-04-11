@@ -21,7 +21,7 @@ The headline table. This is what goes in the paper.
 | CNN+ConvLSTM | CNN+RNN | Kenneth | | | | | |
 | ST-GCN | GNN | Munish | 0.0394 | 0.1231 | 0.0192 | 3.1M | 3.1M |
 | PredRNN | World Model | Munish | 0.0467 | 0.1302 | 0.0164 | 18.6M | 18.6M |
-| Qwen3.5-9B | VLM (QLoRA) | Munish | | | | | |
+| Qwen3.5-4B | VLM (QLoRA) | Munish | 0.5819 | -- | 0.5597 | 2.59B | 3.15M |
 | **V-JEPA** | **SOTA baseline** | **Munish** | 0.6451 | -- | -- | 307M | 0 |
 
 **V-JEPA (SOTA reference):** Meta FAIR's self-supervised ViT for video (`facebookresearch/jepa`). ViT-L/16 backbone pretrained with the V-JEPA objective on VideoMix2M (90K iterations, 300 epochs), attentive probe head pretrained by Meta on SSv2 (20 epochs, world_size=128). Ran eval-only on our 24,777-clip val set with the standard 16x2x3 multi-view protocol on a single V100-32GB. **Reproduced 64.51% top-1**, about 5 points below Meta's published 69.5%. The gap is environmental, not the model: (a) V-JEPA's eval code hardcodes `dtype=torch.float16` in the autocast block even when `use_bfloat16: true` is set, so the run was actually FP16, not BF16. On V100 this matters because tensor cores are FP16-only and the narrower dynamic range shifts logits in the attention softmax. (b) We had to patch decord with `num_threads=1` to avoid an FFmpeg threaded_decoder crash on this host, which may sample frames slightly differently than Meta's original pipeline. Runs in ~4.3 GB VRAM at batch 4. License: CC-BY-NC 4.0 (fine for academic).
@@ -44,7 +44,7 @@ How expensive was each model to train. Important for the cost-vs-accuracy analys
 | ST-GCN | 5.5 | 0.86 | 16 | N/A | 64 | 50 | RTX 5090 |
 | PredRNN | 13.24 | 4.79 | 8 | 224 | 16 | 15 | V100-32GB + RTX 5090 |
 | V-JEPA | N/A (eval only) | 4.3 | 16 | 224 | 4 | 0 | V100-32GB |
-| Qwen3.5-9B | | | | | | | |
+| Qwen3.5-4B | 43.29 | 9.15 | 8 | 224 | 2 (eff 16) | 1 | RTX 5090 (Vast.ai) |
 
 ---
 
@@ -99,7 +99,7 @@ After eval, note which classes get confused with each other the most. Look at of
 | CNN+ConvLSTM | | | |
 | ST-GCN | | | |
 | PredRNN | Something falling like a rock -> Moving something down | 95 | Semantically sensible, falling is a kind of moving down |
-| Qwen3.5-9B | | | |
+| Qwen3.5-4B | Plugging something into something -> Plugging something into something but pulling it right out as you remove your hand | 429 | Picks up the "plug in" motion but misses the extended "pull out" that distinguishes the longer label |
 
 ---
 
@@ -212,15 +212,15 @@ Fill in anything notable about your model -- what worked, what didn't, any surpr
 - What didn't: 4.67% top-1 on 174 classes is still far from usable. Roughly 70% of classes get 0% accuracy. PredRNN's spatiotemporal world model picks up global motion patterns but not the fine-grained hand-object interactions that dominate SSv2 (e.g. attaching something to something, bending something so that it deforms). 8 frames per clip is probably also too few to resolve fast manipulations.
 - Failure modes: The model learns a handful of motion-heavy classes (30-52% accuracy on classes 94, 109, 43, 93, 146, all camera-direction and surface-placement actions) and gets 0% on everything else. Top confused pair is Something falling like a rock -> Moving something down (95 confusions), which is semantically correct because falling is a kind of moving down. Similar for Tearing something into two pieces -> Moving something down (91). PredRNN is predicting the motion correctly but not the physical transformation.
 
-### Qwen3.5-9B (Munish)
-- Pretrained from:
-- Fine-tuning strategy (QLoRA config):
-- Prompt template:
-- Optimizer / LR / Schedule:
-- Best val epoch:
-- What worked:
-- What didn't:
-- Failure modes:
+### Qwen3.5-4B (Munish)
+- Pretrained from: Qwen/Qwen3.5-4B (multimodal VLM, vision encoder + LLM, 2.59B params total)
+- Fine-tuning strategy (QLoRA config): 4-bit NF4 quantization via bitsandbytes 0.49.2 with double quant and fp16 compute, LoRA adapters r=16 alpha=32 dropout=0.05 on q/k/v/o projections only. 3.15M trainable params (0.12% of total). Trained 1 epoch on the full 168,913-clip train set.
+- Prompt template: `"You are watching a short video clip. The frames shown are sampled uniformly from the video. What action is being performed? Respond with ONLY the action label, nothing else."` Classification is done by string-matching the model's generated text against the 174 class names (exact, case-insensitive, then substring fallback).
+- Optimizer / LR / Schedule: AdamW lr=2e-4, weight_decay=0.01, grad clip 1.0, no warmup, no LR schedule (fixed LR for 1 epoch). Gradient accumulation 8 steps on microbatch 2 -> effective batch size 16.
+- Best val epoch: 1 (only epoch run). Val top-1 0.5819, F1 (weighted) 0.5597, mean per-class acc 0.5225.
+- What worked: QLoRA 4-bit loaded cleanly on RTX 5090 Blackwell (sm_120) with bitsandbytes 0.49.2 — no compatibility issues despite the new arch. 3.15M trainable LoRA params converged in a single epoch on 168K samples. Generative classification (model.generate() -> text -> nearest label) works surprisingly well: 58.19% top-1 is within 6 points of V-JEPA's 64.51% SOTA baseline with roughly 1/100 the trainable parameters. Only 10/174 classes are at 0% accuracy (vs ~70% for PredRNN, ~95% for ST-GCN). First run on Windows 5090 was CPU-bound at ~5 s/it; moving to a Linux Vast.ai 5090 with 12 vCPUs dropped the same run to 1.69 s/it (3x speedup) purely by removing Windows dataloader contention.
+- What didn't: Top-5 is architecturally null — Qwen is a generative VLM, there is no 174-dim logit distribution to rank. The Vast.ai dataset.py rewrite reads .webm via decord and passes native-resolution frames to the Qwen processor, which triggered a staircase VRAM allocation pattern (25.4 GB -> 28.4 GB -> 31.3 GB across the epoch as occasional oversized samples pushed PyTorch's cached allocator to new highs). Run finished at 96% VRAM with ~1.3 GB headroom — pre-resizing frames to 224x224 before the processor would have prevented this entirely, but wasn't worth a restart at 64% complete. Training time (43.3 hours) dominates the cost analysis relative to every other model in the suite.
+- Failure modes: Top confused pair is `Plugging something into something -> Plugging something into something but pulling it right out as you remove your hand` (429 confusions). The model correctly picks up the "plug in" motion but cannot distinguish the extended "pull out" that defines the longer label — a legitimate label-ambiguity case where the two actions are functionally the same for the first half of the clip. Zero-accuracy classes cluster around "pretending" variants (Pretending or trying and failing to twist something, Pretending to poke something) and ambiguous throwing/pouring actions. The 10 zero-acc classes also include the base `Pouring something into something`, which gets absorbed into the more specific `Pouring something into something until it overflows` (Qwen's single easiest class at 97.9%). Fine-grained manipulation distinctions remain the model's hard ceiling.
 
 ---
 
