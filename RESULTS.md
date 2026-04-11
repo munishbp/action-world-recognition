@@ -14,7 +14,7 @@ The headline table. This is what goes in the paper.
 |-------|------|-------|-----------|-----------|---------------|--------|-----------------|
 | TSM | CNN | Ayaan | | | | | |
 | R(2+1)D | CNN | Ayaan | | | | | |
-| SlowFast | CNN | Aiden | | | | | |
+| SlowFast | CNN | Aiden | 0.3634 | | | 34M | 34M |
 | TimeSformer | Transformer | Aiden | | | | | |
 | VideoMAE | Transformer | Aiden | | | | | |
 | VideoMamba | SSM | Kenneth | | | | | |
@@ -135,15 +135,21 @@ Fill in anything notable about your model -- what worked, what didn't, any surpr
 - What didn't:
 - Failure modes:
 
-### TimeSformer (Aiden)
-- Pretrained from:
-- Fine-tuning strategy:
-- Attention type (divided/joint/space-only):
-- Optimizer / LR / Schedule:
-- Best val epoch:
-- What worked:
-- What didn't:
-- Failure modes:
+  SlowFast (Aiden)
+
+  - Pretrained from: Kinetics-400 (SlowFast-R50 via facebookresearch/pytorchvideo torch.hub)
+  - Fine-tuning strategy: Full fine-tune — all layers unfrozen, 400-class head replaced with
+  174-class linear layer
+  - Slow/Fast frame config: Fast = 32 frames, Slow = 8 frames (every 4th frame, α=4), 224×224
+  - Optimizer / LR / Schedule: SGD, momentum=0.9, weight decay=1e-4, lr=0.01, cosine annealing to
+  1e-4 over 20 epochs
+  - Best val epoch: N/A — training did not complete
+  - What worked: Loss was decreasing steadily through the first partial epoch (5.09 → 4.58),
+  learning signal present
+  - What didn't: GPU compatibility — RTX 5090 (sm_120) not supported by stable PyTorch builds,
+  caused CUDA kernel crash mid-epoch
+  - Failure modes: CUDA no kernel image error on Blackwell GPUs; batch size 8 with 32 frames is
+  conservative (potentially slow training)
 
 ### VideoMAE (Aiden)
 - Pretrained from:
