@@ -21,7 +21,7 @@ The headline table. This is what goes in the paper.
 | CNN+ConvLSTM | CNN+RNN | Kenneth | | | | | |
 | ST-GCN | GNN | Munish | 0.0394 | 0.1231 | 0.0192 | 3.1M | 3.1M |
 | PredRNN | World Model | Munish | 0.0467 | 0.1302 | 0.0164 | 18.6M | 18.6M |
-| Qwen3.5-9B | VLM (QLoRA) | Munish | | | | | |
+| Qwen3.5-4B | VLM (QLoRA) | Munish | | | | | |
 | **V-JEPA** | **SOTA baseline** | **Munish** | 0.6451 | -- | -- | 307M | 0 |
 
 **V-JEPA (SOTA reference):** Meta FAIR's self-supervised ViT for video (`facebookresearch/jepa`). ViT-L/16 backbone pretrained with the V-JEPA objective on VideoMix2M (90K iterations, 300 epochs), attentive probe head pretrained by Meta on SSv2 (20 epochs, world_size=128). Ran eval-only on our 24,777-clip val set with the standard 16x2x3 multi-view protocol on a single V100-32GB. **Reproduced 64.51% top-1**, about 5 points below Meta's published 69.5%. The gap is environmental, not the model: (a) V-JEPA's eval code hardcodes `dtype=torch.float16` in the autocast block even when `use_bfloat16: true` is set, so the run was actually FP16, not BF16. On V100 this matters because tensor cores are FP16-only and the narrower dynamic range shifts logits in the attention softmax. (b) We had to patch decord with `num_threads=1` to avoid an FFmpeg threaded_decoder crash on this host, which may sample frames slightly differently than Meta's original pipeline. Runs in ~4.3 GB VRAM at batch 4. License: CC-BY-NC 4.0 (fine for academic).
@@ -44,7 +44,7 @@ How expensive was each model to train. Important for the cost-vs-accuracy analys
 | ST-GCN | 5.5 | 0.86 | 16 | N/A | 64 | 50 | RTX 5090 |
 | PredRNN | 13.24 | 4.79 | 8 | 224 | 16 | 15 | V100-32GB + RTX 5090 |
 | V-JEPA | N/A (eval only) | 4.3 | 16 | 224 | 4 | 0 | V100-32GB |
-| Qwen3.5-9B | | | | | | | |
+| Qwen3.5-4B | | | | | | | |
 
 ---
 
@@ -99,7 +99,7 @@ After eval, note which classes get confused with each other the most. Look at of
 | CNN+ConvLSTM | | | |
 | ST-GCN | | | |
 | PredRNN | Something falling like a rock -> Moving something down | 95 | Semantically sensible, falling is a kind of moving down |
-| Qwen3.5-9B | | | |
+| Qwen3.5-4B | | | |
 
 ---
 
@@ -212,7 +212,7 @@ Fill in anything notable about your model -- what worked, what didn't, any surpr
 - What didn't: 4.67% top-1 on 174 classes is still far from usable. Roughly 70% of classes get 0% accuracy. PredRNN's spatiotemporal world model picks up global motion patterns but not the fine-grained hand-object interactions that dominate SSv2 (e.g. attaching something to something, bending something so that it deforms). 8 frames per clip is probably also too few to resolve fast manipulations.
 - Failure modes: The model learns a handful of motion-heavy classes (30-52% accuracy on classes 94, 109, 43, 93, 146, all camera-direction and surface-placement actions) and gets 0% on everything else. Top confused pair is Something falling like a rock -> Moving something down (95 confusions), which is semantically correct because falling is a kind of moving down. Similar for Tearing something into two pieces -> Moving something down (91). PredRNN is predicting the motion correctly but not the physical transformation.
 
-### Qwen3.5-9B (Munish)
+### Qwen3.5-4B (Munish)
 - Pretrained from:
 - Fine-tuning strategy (QLoRA config):
 - Prompt template:
