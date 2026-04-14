@@ -15,7 +15,7 @@ import os
 import sys
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_PROJECT_ROOT = os.path.abspath(os.path.join(_SCRIPT_DIR, ".."))
+_PROJECT_ROOT = os.path.abspath(os.path.join(_SCRIPT_DIR, "..", ".."))
 sys.path.insert(0, _PROJECT_ROOT)
 
 from shared.dataset import (  # noqa: E402

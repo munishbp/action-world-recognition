@@ -4,9 +4,12 @@ Train TSM ResNet-50 on Something-Something V2 (RGB clips).
 Usage (from repo root):
     python models/TSM/train.py
     python models/TSM/train.py --epochs 50 --batch-size 8 --num-frames 8 --lr 0.02
+    python models/TSM/train.py --gpu-ids 0,1
 
 Checkpoints: models/TSM/checkpoints/
-Results:     results/TSM_results.json (via shared.evaluate)
+  - metrics.csv (per-epoch train/val)
+  - TSM_results.json + TSM_confusion_matrix.npy (copies of final eval; same as under results/)
+Results:     results/TSM_results.json + TSM_confusion_matrix.npy (from shared.evaluate)
 
 If ``models/TSM/decode_failures.txt`` exists (from ``scan_decode_failures.py --output``), it is used
 automatically unless you pass ``--no-decode-blacklist``.
@@ -18,8 +21,10 @@ from __future__ import annotations
 
 import argparse
 import csv
+import inspect
 import json
 import os
+import shutil
 import sys
 import time
 
@@ -36,11 +41,7 @@ sys.path.insert(0, _PROJECT_ROOT)
 sys.path.insert(0, _SCRIPT_DIR)
 
 from shared import evaluate_model, get_dataloader, save_results
-from shared.dataset import (
-    DEFAULT_ROOT,
-    DEFAULT_VIDEOS_SUBDIR,
-    resolve_ssv2_annotation_path,
-)
+from shared import dataset as shared_dataset
 from tsm import TSMResNet50
 
 # Paths: checkpoints next to this script; results at repo root
@@ -52,6 +53,37 @@ DEFAULT_DECODE_FAILURES_TXT = os.path.join(_SCRIPT_DIR, "decode_failures.txt")
 # SSv2 label count (must match something-something-v2-labels.json)
 NUM_CLASSES = 174
 DEFAULT_EPOCHS = 50
+DEFAULT_ROOT = shared_dataset.DEFAULT_ROOT
+DEFAULT_VIDEOS_SUBDIR = getattr(shared_dataset, "DEFAULT_VIDEOS_SUBDIR", "")
+
+
+def resolve_ssv2_annotation_path(annotations_dir: str, canonical_name: str) -> str:
+    resolver = getattr(shared_dataset, "resolve_ssv2_annotation_path", None)
+    if resolver is not None:
+        return resolver(annotations_dir, canonical_name)
+    return os.path.join(annotations_dir, canonical_name)
+
+
+def _parse_gpu_ids(s: str) -> list[int]:
+    parts = [p.strip() for p in s.split(",") if p.strip()]
+    return [int(p) for p in parts]
+
+
+def _unwrap_model(model: nn.Module) -> nn.Module:
+    if isinstance(model, nn.DataParallel):
+        return model.module
+    return model
+
+
+def _model_state_dict(model: nn.Module) -> dict:
+    return _unwrap_model(model).state_dict()
+
+
+def _load_state_dict_into_model(model: nn.Module, state: dict) -> None:
+    """Load checkpoint weights; strips ``module.`` prefix if present (DP vs single-GPU ckpt)."""
+    if any(k.startswith("module.") for k in state):
+        state = {k.replace("module.", "", 1): v for k, v in state.items()}
+    _unwrap_model(model).load_state_dict(state)
 
 
 def _num_classes_from_annotations(annotations_dir: str) -> int:
@@ -81,7 +113,7 @@ def _num_classes_from_annotations(annotations_dir: str) -> int:
             f"Invalid JSON in labels file: {path}\n"
             f"  ({e})\n"
             f"  File size: {size} bytes; starts with: {head!r}\n"
-            f"  Often this is a failed download (HTML), wrong file renamed, or UTF-16 export — "
+            f"  Often this is a download (HTML), wrong file renamed, or UTF-16 export — "
             f"replace with the real something-something-v2-labels.json from Qualcomm / SSv2."
         ) from e
     return len(m)
@@ -94,6 +126,7 @@ def train_one_epoch(model, loader, criterion, optimizer, device):
     total = 0
 
     for batch in tqdm(loader, desc="  Train", leave=False):
+        print("BATCH:", batch is not None)
         if batch is None:
             continue
         frames, labels = batch
@@ -181,6 +214,15 @@ def main():
         help="Subfolder under --data-root containing {id}.webm; use empty string if videos sit directly in data-root",
     )
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
+    parser.add_argument(
+        "--gpu-ids",
+        type=str,
+        default=None,
+        help=(
+            "Comma-separated CUDA indices for multi-GPU DataParallel, e.g. 0,1. "
+            "Effective batch is split across GPUs. Omit for single GPU (--device)."
+        ),
+    )
     parser.add_argument("--resume", type=str, default=None, help="Checkpoint path to resume")
     parser.add_argument(
         "--decode-blacklist",
@@ -198,8 +240,22 @@ def main():
     )
     args = parser.parse_args()
 
-    device = torch.device(args.device)
-    print(f"Device: {device}")
+    gpu_ids: list[int] | None = None
+    if args.gpu_ids:
+        gpu_ids = _parse_gpu_ids(args.gpu_ids)
+        if not torch.cuda.is_available():
+            raise SystemExit("--gpu-ids requires CUDA; set CUDA_VISIBLE_DEVICES or install a CUDA build of PyTorch.")
+        n = torch.cuda.device_count()
+        for gid in gpu_ids:
+            if gid < 0 or gid >= n:
+                raise SystemExit(f"Invalid --gpu-ids {gpu_ids}: need 0 <= id < {n} visible GPU(s).")
+        device = torch.device(f"cuda:{gpu_ids[0]}")
+        print(f"Device: {device}  (DataParallel on physical GPU ids {gpu_ids})")
+    else:
+        device = torch.device(args.device)
+        if device.type == "cuda" and not torch.cuda.is_available():
+            raise SystemExit("CUDA requested but not available.")
+        print(f"Device: {device}")
 
     annotations_dir = os.path.join(args.data_root, "annotations")
     videos_subdir = (args.videos_subdir or "").strip() or None
@@ -228,25 +284,27 @@ def main():
         print(f"Note: num_classes from JSON = {num_classes} (expected {NUM_CLASSES})")
 
     print("Loading data (building dataloaders; first epoch may be slow while workers start)...", flush=True)
-    train_loader = get_dataloader(
-        split="train",
-        batch_size=args.batch_size,
+    loader_sig = inspect.signature(get_dataloader)
+    common_loader_kwargs = dict(
         num_frames=args.num_frames,
         num_workers=args.num_workers,
         root=args.data_root,
         annotations_dir=annotations_dir,
-        videos_subdir=videos_subdir,
-        video_id_blacklist_path=decode_blacklist,
+    )
+    if "videos_subdir" in loader_sig.parameters:
+        common_loader_kwargs["videos_subdir"] = videos_subdir
+    if "video_id_blacklist_path" in loader_sig.parameters:
+        common_loader_kwargs["video_id_blacklist_path"] = decode_blacklist
+
+    train_loader = get_dataloader(
+        split="train",
+        batch_size=args.batch_size,
+        **common_loader_kwargs,
     )
     val_loader = get_dataloader(
         split="val",
         batch_size=max(args.batch_size * 2, 1),
-        num_frames=args.num_frames,
-        num_workers=args.num_workers,
-        root=args.data_root,
-        annotations_dir=annotations_dir,
-        videos_subdir=videos_subdir,
-        video_id_blacklist_path=decode_blacklist,
+        **common_loader_kwargs,
     )
     print(
         f"Samples — train: {len(train_loader.dataset)}, val: {len(val_loader.dataset)} | "
@@ -260,6 +318,9 @@ def main():
         shift_div=args.shift_div,
         pretrained=not args.no_pretrained,
     ).to(device)
+
+    if gpu_ids is not None and len(gpu_ids) > 1:
+        model = nn.DataParallel(model, device_ids=gpu_ids)
 
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -283,7 +344,7 @@ def main():
     best_val_acc = 0.0
     if args.resume and os.path.isfile(args.resume):
         ckpt = torch.load(args.resume, map_location=device, weights_only=False)
-        model.load_state_dict(ckpt["model_state_dict"])
+        _load_state_dict_into_model(model, ckpt["model_state_dict"])
         optimizer.load_state_dict(ckpt["optimizer_state_dict"])
         scheduler.load_state_dict(ckpt["scheduler_state_dict"])
         start_epoch = ckpt["epoch"] + 1
@@ -298,7 +359,9 @@ def main():
             csv.DictWriter(f, fieldnames=metrics_fields).writeheader()
 
     if device.type == "cuda":
-        torch.cuda.reset_peak_memory_stats(device)
+        _mem_gids = gpu_ids if gpu_ids else [device.index if device.index is not None else 0]
+        for gid in _mem_gids:
+            torch.cuda.reset_peak_memory_stats(torch.device(f"cuda:{gid}"))
 
     print(
         f"\nStarting training: {args.epochs} epochs "
@@ -329,7 +392,7 @@ def main():
 
         ckpt = {
             "epoch": epoch,
-            "model_state_dict": model.state_dict(),
+            "model_state_dict": _model_state_dict(model),
             "optimizer_state_dict": optimizer.state_dict(),
             "scheduler_state_dict": scheduler.state_dict(),
             "train_loss": train_loss,
@@ -357,7 +420,13 @@ def main():
             })
 
     training_time = time.time() - training_start
-    peak_vram = torch.cuda.max_memory_allocated(device) / 1e9 if device.type == "cuda" else 0.0
+    if device.type == "cuda":
+        _mem_gids = gpu_ids if gpu_ids else [device.index if device.index is not None else 0]
+        peak_vram = max(
+            torch.cuda.max_memory_allocated(torch.device(f"cuda:{gid}")) for gid in _mem_gids
+        ) / 1e9
+    else:
+        peak_vram = 0.0
 
     print("\nTraining complete!")
     print(f"  Time: {training_time / 3600:.2f} hours")
@@ -367,7 +436,7 @@ def main():
     print("\nFinal evaluation (best checkpoint)...")
     best_path = os.path.join(CHECKPOINT_DIR, "best.pt")
     best_ckpt = torch.load(best_path, map_location=device, weights_only=False)
-    model.load_state_dict(best_ckpt["model_state_dict"])
+    _load_state_dict_into_model(model, best_ckpt["model_state_dict"])
     _, _, final_logits, final_labels = validate(model, val_loader, criterion, device)
 
     results = evaluate_model(
@@ -379,8 +448,13 @@ def main():
         total_params=total_params,
         trainable_params=trainable_params,
     )
-    save_results(results, output_dir=RESULTS_DIR)
-    print(f"Results saved to {os.path.join(RESULTS_DIR, 'TSM_results.json')}")
+    json_path, npy_path = save_results(results, output_dir=RESULTS_DIR)
+    cp_json = os.path.join(CHECKPOINT_DIR, "TSM_results.json")
+    cp_npy = os.path.join(CHECKPOINT_DIR, "TSM_confusion_matrix.npy")
+    shutil.copy2(json_path, cp_json)
+    shutil.copy2(npy_path, cp_npy)
+    print(f"Per-epoch metrics CSV: {os.path.abspath(metrics_path)}")
+    print(f"Final eval JSON: {json_path} (copy: {cp_json})")
 
 
 if __name__ == "__main__":
