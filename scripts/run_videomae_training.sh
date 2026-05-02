@@ -31,7 +31,7 @@ if ! command -v python &>/dev/null; then
 fi
 
 python models/videomae/train.py \
-    --epochs 30 \
+    --epochs 15 \
     --batch-size 64 \
     --lr 5e-4 \
     --num-frames 16 \
