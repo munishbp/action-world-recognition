@@ -20,7 +20,9 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import os
+import platform
 import sys
 import time
 
@@ -230,11 +232,35 @@ def main():
 
     if device.type == "cuda":
         torch.cuda.reset_peak_memory_stats(device)
+        gpu_name = torch.cuda.get_device_name(device)
+    else:
+        gpu_name = platform.processor() or device.type
 
     smoke_batches = 2 if args.smoke_test else None
     num_epochs = 1 if args.smoke_test else args.epochs
     if args.smoke_test:
         print("\n[SMOKE TEST] Running 2 train + 2 val batches for 1 epoch.\n")
+
+    # Run-config snapshot — used to augment the results JSON so RESULTS.md
+    # can be filled from a single file without remembering CLI args.
+    run_config = {
+        "pretrained":       args.pretrained,
+        "num_frames":       args.num_frames,
+        "frame_size":       224,
+        "batch_size":       args.batch_size,
+        "epochs":           args.epochs,
+        "lr":               args.lr,
+        "lr_min":           args.lr_min,
+        "weight_decay":     args.weight_decay,
+        "mixed_precision":  args.mixed_precision,
+        "gpu_name":         gpu_name,
+        "fine_tuning":      "full fine-tune, fresh 174-class head",
+        "masking_ratio":    "N/A (fine-tuning; pretrain used 90%)",
+        "optimizer":        "AdamW",
+        "lr_schedule":      f"cosine {args.lr:.1e} -> {args.lr_min:.1e} over {args.epochs} epochs",
+    }
+
+    best_val_epoch = -1
 
     print(f"\nStarting training: {num_epochs} epochs → checkpoints: {os.path.abspath(CHECKPOINT_DIR)}\n")
     training_start = time.time()
@@ -259,6 +285,7 @@ def main():
         is_best = val_acc > best_val_acc
         if is_best:
             best_val_acc = val_acc
+            best_val_epoch = epoch + 1
             print(f"  New best: {best_val_acc:.4f}")
 
         ckpt = {
@@ -290,6 +317,29 @@ def main():
                 "best_val_acc": f"{best_val_acc:.4f}",
             })
 
+        # Crash-safety: write a partial results JSON every epoch so we still
+        # have something usable if the instance dies mid-run.
+        os.makedirs(RESULTS_DIR, exist_ok=True)
+        partial = {
+            "model_name":           "VideoMAE",
+            "status":               "in_progress",
+            "epoch_completed":      epoch + 1,
+            "epochs_total":         args.epochs,
+            "best_val_acc":         round(best_val_acc, 5),
+            "best_val_epoch":       best_val_epoch,
+            "train_loss":           round(train_loss, 5),
+            "train_acc":            round(train_acc, 5),
+            "val_loss":             round(val_loss, 5),
+            "val_acc":              round(val_acc, 5),
+            "training_time_hours":  round((time.time() - training_start) / 3600, 3),
+            "peak_vram_gb":         round(torch.cuda.max_memory_allocated(device) / 1e9, 2) if device.type == "cuda" else 0.0,
+            "total_params":         total_params,
+            "trainable_params":     trainable_params,
+            **run_config,
+        }
+        with open(os.path.join(RESULTS_DIR, "VideoMAE_results_partial.json"), "w") as f:
+            json.dump(partial, f, indent=2)
+
     training_time = time.time() - training_start
     peak_vram = (torch.cuda.max_memory_allocated(device) / 1e9) if device.type == "cuda" else 0.0
 
@@ -320,7 +370,17 @@ def main():
         trainable_params=trainable_params,
     )
     save_results(results, output_dir=RESULTS_DIR)
-    print(f"Results saved to {os.path.join(RESULTS_DIR, 'VideoMAE_results.json')}")
+
+    # Augment the saved JSON with run config so RESULTS.md can be filled
+    # from one file. shared.evaluate_model has a fixed schema; we read it
+    # back, merge, and rewrite.
+    json_path = os.path.join(RESULTS_DIR, "VideoMAE_results.json")
+    with open(json_path) as f:
+        merged = json.load(f)
+    merged.update({"best_val_epoch": best_val_epoch, **run_config})
+    with open(json_path, "w") as f:
+        json.dump(merged, f, indent=2)
+    print(f"Results (with run config) saved to {json_path}")
 
 
 if __name__ == "__main__":
