@@ -127,8 +127,12 @@ def main():
     )
     print(f"Val samples: {len(val_loader.dataset):,} | batches: {len(val_loader)}")
 
-    print(f"Building VideoMamba-{args.model} (num_frames={args.num_frames})...")
-    model = BUILDERS[args.model](num_classes=NUM_CLASSES, num_frames=args.num_frames).to(device)
+    print(f"Building VideoMamba-{args.model} (num_frames={args.num_frames}, bimamba_type=v2)...")
+    model = BUILDERS[args.model](
+        num_classes=NUM_CLASSES,
+        num_frames=args.num_frames,
+        bimamba_type="v2",
+    ).to(device)
     total_params = sum(p.numel() for p in model.parameters())
     print(f"Parameters: {total_params:,}")
 
