@@ -16,8 +16,8 @@ The headline table. This is what goes in the paper.
 | R(2+1)D | CNN | Ayaan | 0.4636|0.7484 |0.4611 |31.3M |31.3M |
 | SlowFast | CNN | Aiden | 0.3634 | | | 34M | 34M |
 | TimeSformer | Transformer | Aiden | | | | | |
-| VideoMAE | Transformer | Aiden | | | | | |
-| VideoMamba | SSM | Kenneth | | | | | |
+| VideoMAE | Transformer | Aiden | 0.1692 | 0.3984 | 0.1584 | 86.4M | 86.4M |
+| VideoMamba | SSM | Kenneth | 0.0145 | 0.0613 | 0.0004 | 6.3M | 6.3M |
 | CNN+ConvLSTM | CNN+RNN | Kenneth | | | | | |
 | ST-GCN | GNN | Munish | 0.0394 | 0.1231 | 0.0192 | 3.1M | 3.1M |
 | PredRNN | World Model | Munish | 0.0467 | 0.1302 | 0.0164 | 18.6M | 18.6M |
@@ -38,8 +38,8 @@ How expensive was each model to train. Important for the cost-vs-accuracy analys
 | R(2+1)D |105.22 |12.53 |8 | 224 |8 |30 |RTX 5090 |
 | SlowFast | | | | 224 | | | |
 | TimeSformer | | | | 224 | | | |
-| VideoMAE | | | | 224 | | | |
-| VideoMamba | | | | 224 | | | |
+| VideoMAE | 19.17 | 40.56 | 16 | 224 | 64 | 11 (of 15) | RTX Pro 6000 Blackwell 96GB (Vast.ai) |
+| VideoMamba | 4.37 | 38.02 | 16 | 224 | 16 | 10 (of 30) | unknown (likely A100, per SETUP.MD) |
 | CNN+ConvLSTM | | | | 224 | | | |
 | ST-GCN | 5.5 | 0.86 | 16 | N/A | 64 | 50 | RTX 5090 |
 | PredRNN | 13.24 | 4.79 | 8 | 224 | 16 | 15 | V100-32GB + RTX 5090 |
@@ -94,7 +94,7 @@ After eval, note which classes get confused with each other the most. Look at of
 | R(2+1)D |Removing something, revealing something behind -> Moving part of something|54|Similar-looking motion hides different interaction semantics when the model misses how objects relate to each other|
 | SlowFast | | | |
 | TimeSformer | | | |
-| VideoMAE | | | |
+| VideoMAE | Tearing something just a little bit -> Tearing something into two pieces | 57 | Both involve the same tearing motion; the distinction is degree, not kinematics |
 | VideoMamba | | | |
 | CNN+ConvLSTM | | | |
 | ST-GCN | | | |
@@ -152,14 +152,14 @@ Fill in anything notable about your model -- what worked, what didn't, any surpr
   conservative (potentially slow training)
 
 ### VideoMAE (Aiden)
-- Pretrained from:
-- Fine-tuning strategy:
-- Masking ratio:
-- Optimizer / LR / Schedule:
-- Best val epoch:
-- What worked:
-- What didn't:
-- Failure modes:
+- Pretrained from: MCG-NJU/videomae-base (ViT-B/16 self-supervised on Kinetics-400, 800 epochs)
+- Fine-tuning strategy: full fine-tune, attached fresh 174-class head via HuggingFace `VideoMAEForVideoClassification.from_pretrained(..., ignore_mismatched_sizes=True)`. Forward signature `(B, T, C, H, W)` exactly matches `shared.get_dataloader` so no permute step needed (unlike VideoMamba/R(2+1)D).
+- Masking ratio: N/A for fine-tuning. Original pretrain on Kinetics-400 used 90% masking with the tube-masking scheme.
+- Optimizer / LR / Schedule: AdamW lr=5e-4, weight_decay=0.05, cosine annealing to 1e-6 over 15 epochs, bf16 autocast (no GradScaler needed).
+- Best val epoch: 11 of 15 attempted (val top-1 0.1691). Vast.ai host paused the instance for ~24 hrs after epoch 11, training never reached epoch 15. Final canonical eval ran as a sidecar pass off `best.pt` while training was still resuming.
+- What worked: HuggingFace `transformers` 5.7.0 loaded the K400 pretrain cleanly on Blackwell sm_120 with PyTorch 2.11+cu130 — no kernel-image issues like SlowFast hit on the 5090. bf16 ran end-to-end on the Pro 6000 with no GradScaler needed. Camera-pan classes were the easiest (Turning the camera left/right/up/down all >0.55, max 0.736), consistent with VideoMAE's strong bias toward dominant motion. Top-5 0.398 vs Top-1 0.169 means the model usually has the right action class in its short-list even when the head pick is wrong.
+- What didn't: Training pace was 3-4x slower than my benchmark predicted (1.74 hr/epoch actual vs 0.85 hr/epoch in a clean iter() benchmark). Root cause was dataloader stalls — workers periodically blocked on slow webm decodes, so GPU sat at 0% util during those windows even though VRAM was healthy at 40.6 GB / 96 GB. More workers (16+) would probably help. Also lost ~24 hrs of wall-clock to a Vast.ai host pause that froze the process mid-epoch-12 (process state preserved, just no compute time charged or progressed).
+- Failure modes: 22/174 classes at 0% accuracy. Hardest are the spilling/pouring-with-negation classes (`Spilling something behind something`, `Trying to pour something into something but missing so it spills next to it`) — these require physical-outcome reasoning the model doesn't get from RGB alone. Most-confused pair is `Tearing something just a little bit -> Tearing something into two pieces` (57 confusions); same kinematic action, the only difference is the magnitude of the tear, which is hard to pick up from 16 sampled frames. Pattern matches what V-JEPA and Qwen also struggle with: fine-grained physical-state distinctions inside a single visually-similar action template.
 
 ### VideoMamba (Kenneth)
 - Pretrained from:
