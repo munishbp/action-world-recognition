@@ -91,7 +91,7 @@ After eval, note which classes get confused with each other the most. Look at of
 | Model | Most Confused Pair (A -> predicted as B) | Count | Notes |
 |-------|------------------------------------------|-------|-------|
 | TSM |Moving something and something so they pass each other -> Something colliding with something and both are being deflected | 7| Similar actions however missing the context of object is colliding and when they are passing one another|
-| R(2+1)D | | | |
+| R(2+1)D |Removing something, revealing something behind -> Moving part of something|54|Similar-looking motion hides different interaction semantics when the model misses how objects relate to each other|
 | SlowFast | | | |
 | TimeSformer | | | |
 | VideoMAE | | | |
