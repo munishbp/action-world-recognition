@@ -109,7 +109,7 @@ Fill in anything notable about your model -- what worked, what didn't, any surpr
 
 ### TSM (Ayaan)
 - Pretrained from: ResNet50 with the ImageNet dataset, default weights
-- Fine-tuning strategy:
+- Fine-tuning strategy: Start from ImageNet-pretrained ResNet-50, inject temporal shift in each bottleneck, swap the head for 174 classes, and update the whole network
 - Optimizer / LR / Schedule: SGD, momentum=0.9, weight decay = 1e-4, Peak Learning Rate 0.02, Cosine Annealing Learning to 2.5e-04 over 30 epochs
 - Best val epoch: Epoch 30, val accuracy of 0.0626
 - What worked: Training accuracy went to 96% and loss drops steadily so model fits the training set
@@ -117,13 +117,13 @@ Fill in anything notable about your model -- what worked, what didn't, any surpr
 - Failure modes (what does it get wrong?): Most Validation classes results may be random, errors are not class specific
 
 ### R(2+1)D (Ayaan)
-- Pretrained from:
-- Fine-tuning strategy:
-- Optimizer / LR / Schedule:
-- Best val epoch:
-- What worked:
-- What didn't:
-- Failure modes:
+- Pretrained from: R2Plus1D_18 with defualt weights
+- Fine-tuning strategy: Start from Torchvision’s pretrained R(2+1)D-18, replace the final FC with 174 outputs, and fine-tune the full 3D backbone and head on multi-frame clips
+- Optimizer / LR / Schedule: SGD, momentum=0.9, weight decay = 1e-4, Peak Learning Rate 0.01, Cosine Annealing Learning to 1.3e-04 over 30 epochs
+- Best val epoch: Epoch 30, val accuracy of 0.4635
+- What worked: Smooth train and val improvement through ~epoch 20–25; val reaches ~46% with 168,912 train samples and 24,777 val samples used
+- What didn't:Late epochs: train acc ~97% vs val ~46% → overfitting; gains after ~epoch 21–25 are small while val loss creeps up (~2.55 → ~2.85)
+- Failure modes: At ~46% val on 174 classes you still expect verb / motion confusions and hard tail classes
 
 ### SlowFast (Aiden)
 - Pretrained from:
