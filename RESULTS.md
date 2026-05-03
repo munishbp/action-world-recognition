@@ -13,7 +13,7 @@ The headline table. This is what goes in the paper.
 | Model | Type | Owner | Top-1 Acc | Top-5 Acc | F1 (weighted) | Params | Trainable Params |
 |-------|------|-------|-----------|-----------|---------------|--------|-----------------|
 | TSM | CNN | Ayaan |0.06265 |0.15305 |0.06817 | 23.8M|23.8M |
-| R(2+1)D | CNN | Ayaan | | | | | |
+| R(2+1)D | CNN | Ayaan | 0.4636|0.7484 |0.4611 |31.3M |31.3M |
 | SlowFast | CNN | Aiden | 0.3634 | | | 34M | 34M |
 | TimeSformer | Transformer | Aiden | | | | | |
 | VideoMAE | Transformer | Aiden | | | | | |
