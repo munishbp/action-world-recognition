@@ -17,7 +17,7 @@ The headline table. This is what goes in the paper.
 | SlowFast | CNN | Aiden | 0.3634 | | | 34M | 34M |
 | TimeSformer | Transformer | Aiden | | | | | |
 | VideoMAE | Transformer | Aiden | 0.1692 | 0.3984 | 0.1584 | 86.4M | 86.4M |
-| VideoMamba | SSM | Kenneth | | | | | |
+| VideoMamba | SSM | Kenneth | 0.0145 | 0.0613 | 0.0004 | 6.3M | 6.3M |
 | CNN+ConvLSTM | CNN+RNN | Kenneth | | | | | |
 | ST-GCN | GNN | Munish | 0.0394 | 0.1231 | 0.0192 | 3.1M | 3.1M |
 | PredRNN | World Model | Munish | 0.0467 | 0.1302 | 0.0164 | 18.6M | 18.6M |
@@ -39,7 +39,7 @@ How expensive was each model to train. Important for the cost-vs-accuracy analys
 | SlowFast | | | | 224 | | | |
 | TimeSformer | | | | 224 | | | |
 | VideoMAE | 19.17 | 40.56 | 16 | 224 | 64 | 11 (of 15) | RTX Pro 6000 Blackwell 96GB (Vast.ai) |
-| VideoMamba | | | | 224 | | | |
+| VideoMamba | 4.37 | 38.02 | 16 | 224 | 16 | 10 (of 30) | unknown (likely A100, per SETUP.MD) |
 | CNN+ConvLSTM | | | | 224 | | | |
 | ST-GCN | 5.5 | 0.86 | 16 | N/A | 64 | 50 | RTX 5090 |
 | PredRNN | 13.24 | 4.79 | 8 | 224 | 16 | 15 | V100-32GB + RTX 5090 |
