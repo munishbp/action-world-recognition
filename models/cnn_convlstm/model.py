@@ -4,7 +4,10 @@ import torch
 import torch.nn as nn
 from torchvision.models import ResNet18_Weights, resnet18
 
-from .convlstm import ConvLSTM
+try:
+    from .convlstm import ConvLSTM
+except ImportError:
+    from convlstm import ConvLSTM
 
 
 class ResNet18Trunk(nn.Module):
