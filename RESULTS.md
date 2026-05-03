@@ -90,7 +90,8 @@ After eval, note which classes get confused with each other the most. Look at of
 
 | Model | Most Confused Pair (A -> predicted as B) | Count | Notes |
 |-------|------------------------------------------|-------|-------|
-| TSM | | | |
+| TSM |Moving something and something so they pass each other -> Something colliding with something and both are being
+deflected | 7| Similar actions however missing the context of object is colliding and when they are passing one another|
 | R(2+1)D | | | |
 | SlowFast | | | |
 | TimeSformer | | | |
