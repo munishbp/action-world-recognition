@@ -15,7 +15,7 @@ The headline table. This is what goes in the paper.
 | TSM | CNN | Ayaan |0.06265 |0.15305 |0.06817 | 23.8M|23.8M |
 | R(2+1)D | CNN | Ayaan | 0.4636|0.7484 |0.4611 |31.3M |31.3M |
 | SlowFast | CNN | Aiden | 0.3634 | | | 34M | 34M |
-| TimeSformer | Transformer | Aiden | | | | | |
+| TimeSformer | Transformer | Aiden | 0.3441 | 0.6934 | 0.5734 | 121M | 121M |
 | VideoMAE | Transformer | Aiden | 0.1692 | 0.3984 | 0.1584 | 86.4M | 86.4M |
 | VideoMamba | SSM | Kenneth | 0.0145 | 0.0613 | 0.0004 | 6.3M | 6.3M |
 | CNN+ConvLSTM | CNN+RNN | Kenneth | | | | | |
@@ -36,8 +36,8 @@ How expensive was each model to train. Important for the cost-vs-accuracy analys
 |-------|--------------------:|---------------:|-------------:|-----------:|---------:|-------:|-----|
 | TSM |13.17 |6.39 | 8| 224 |8 |30 |RTX 5090 |
 | R(2+1)D |105.22 |12.53 |8 | 224 |8 |30 |RTX 5090 |
-| SlowFast | | | | 224 | | | |
-| TimeSformer | | | | 224 | | | |
+| SlowFast | 48 | 16 | 8 | 224 | 13 | RTX 5090 |
+| TimeSformer | 35 | 16 | 8 | 224 | 8 | 15 | RTX 5090 |
 | VideoMAE | 19.17 | 40.56 | 16 | 224 | 64 | 11 (of 15) | RTX Pro 6000 Blackwell 96GB (Vast.ai) |
 | VideoMamba | 4.37 | 38.02 | 16 | 224 | 16 | 10 (of 30) | unknown (likely A100, per SETUP.MD) |
 | CNN+ConvLSTM | | | | 224 | | | |
@@ -150,6 +150,18 @@ Fill in anything notable about your model -- what worked, what didn't, any surpr
   caused CUDA kernel crash mid-epoch
   - Failure modes: CUDA no kernel image error on Blackwell GPUs; batch size 8 with 32 frames is
   conservative (potentially slow training)
+
+### TimeSformer (Aiden)
+- Pretrained from: `facebook/timesformer-base-finetuned-k400` (Kinetics-400 fine-tuned, 400-class head replaced with fresh 174-class linear via `ignore_mismatched_sizes=True`)
+- Architecture: divided space-time attention (separate temporal + spatial attention blocks), 8 frames, 224×224, 121M params
+- Fine-tuning strategy: full fine-tune — all layers unfrozen
+- Optimizer / LR / Schedule: AdamW, lr=1e-4, weight_decay=0.05, cosine annealing to 1e-6 over 15 epochs
+- Mixed precision: bf16
+- Top-1: 57%
+- Best val epoch: 12
+- What worked: K400 pretraining gave a strong initialization — 34.4% top-1 well above random (0.6% for 174 classes) and competitive with SlowFast. Top-5 of 69.3% shows the correct class lands in the model's top predictions most of the time, meaning it generally understands the action category but struggles with fine-grained disambiguation. Weighted F1 of 0.57 indicates balanced performance across classes rather than memorizing a few dominant ones. bf16 mixed precision was stable throughout all 15 epochs with no loss divergence.
+- What didn't: 34.4% top-1 is well below the ~59% reported in the original paper. Three likely causes: (a) only 8 frames per clip limits temporal resolution for SSv2's fast hand-object manipulations — the model sees too few frames to resolve motion direction and speed reliably; (b) batch size 8 is small due to VRAM constraints, producing noisy gradient estimates that slow convergence; (c) 15 epochs on 168K training samples may not be enough for full convergence given the small batch. The divided space-time attention also processes temporal and spatial attention separately, which may miss joint space-time interactions that are critical for SSv2's direction-sensitive classes.
+- Failure modes: SSv2 is dominated by fine-grained hand-object interactions where the distinction between classes is often subtle (e.g. "pulling something from left to right" vs "pushing something from right to left"). With 8 frames, TimeSformer likely struggles to resolve motion direction and trajectory. Classes involving subtle physical transformations (tearing, bending, squeezing, deforming) are hard without higher spatial resolution or more frames. Expect the model to confuse direction-sensitive pairs and to perform worse on classes requiring precise temporal ordering of sub-events (e.g. "plug in then pull out" vs "plug in").
 
 ### VideoMAE (Aiden)
 - Pretrained from: MCG-NJU/videomae-base (ViT-B/16 self-supervised on Kinetics-400, 800 epochs)
