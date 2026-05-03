@@ -1,0 +1,2 @@
+epoch,lr,train_loss,train_acc,val_loss,val_acc,best_val_acc
+1,5.0e-04,4.7849,0.0345,4.7565,0.0414,0.0414
