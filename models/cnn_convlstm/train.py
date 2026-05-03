@@ -1,17 +1,3 @@
-"""
-Train CNN + ConvLSTM on Something-Something V2 (RGB clips).
-
-Usage (from repo root):
-    python models/cnn_convlstm/train.py
-    python models/cnn_convlstm/train.py --epochs 30 --batch-size 16 --num-frames 8 --lr 1e-3
-    python models/cnn_convlstm/train.py --gpu-ids 0,1
-
-Checkpoints: models/cnn_convlstm/checkpoints/
-  - metrics.csv (per-epoch train/val)
-  - CNNConvLSTM_results.json + CNNConvLSTM_confusion_matrix.npy (copies of final eval)
-Results:     results/CNNConvLSTM_results.json + CNNConvLSTM_confusion_matrix.npy
-"""
-
 from __future__ import annotations
 
 import argparse

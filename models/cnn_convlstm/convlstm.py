@@ -1,12 +1,3 @@
-"""
-ConvLSTM module — adapted from https://github.com/ndrplz/ConvLSTM_pytorch.
-
-A ConvLSTM replaces the fully-connected gates of a standard LSTM with 2D
-convolutions, so the cell state and hidden state remain spatial feature maps
-``(B, C, H, W)`` rather than flat vectors. This lets it model temporal
-dynamics while preserving spatial structure across frames.
-"""
-
 from __future__ import annotations
 
 import torch
@@ -53,8 +44,6 @@ class ConvLSTMCell(nn.Module):
 
 
 class ConvLSTM(nn.Module):
-    """Multi-layer ConvLSTM operating on inputs shaped ``(B, T, C, H, W)``."""
-
     def __init__(
         self,
         input_dim: int,

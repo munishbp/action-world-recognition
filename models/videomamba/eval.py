@@ -1,26 +1,3 @@
-"""
-Eval-only run of an SSv2-finetuned VideoMamba checkpoint on the SSv2 val set.
-
-Mirrors models/videomamba/train.py but skips training entirely and loads the
-SSv2-finetuned head from the checkpoint (unlike the IN1K loader in
-models/videomamba.py, which strips head.weight/bias to support fine-tuning).
-
-Usage (from repo root):
-    # Tiny @ 8 frames (matches videomamba_t16_ssv2_f8_res224.pth)
-    python models/videomamba/eval.py \
-        --model tiny --num-frames 8 \
-        --ckpt models/videomamba/checkpoints/videomamba_t16_ssv2_f8_res224.pth
-
-    # Small @ 16 frames
-    python models/videomamba/eval.py \
-        --model small --num-frames 16 \
-        --ckpt models/videomamba/checkpoints/videomamba_s16_ssv2_f16_res224.pth
-
-Writes:
-    results/VideoMambaSSv2Pretrained_results.json
-    results/VideoMambaSSv2Pretrained_confusion_matrix.npy
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -55,7 +32,6 @@ BUILDERS = {
 
 
 def load_ssv2_checkpoint(model: nn.Module, ckpt_path: str) -> None:
-    """Load an SSv2-finetuned VideoMamba checkpoint, keeping the 174-class head."""
     raw = torch.load(ckpt_path, map_location="cpu", weights_only=False)
     if isinstance(raw, dict):
         for key in ("model", "module", "state_dict", "model_state_dict"):

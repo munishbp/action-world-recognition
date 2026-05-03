@@ -1,22 +1,3 @@
-"""
-CNN + ConvLSTM video classifier.
-
-Wiring follows https://github.com/jerinka/LSTM_Video_classifier — a per-frame
-CNN backbone produces features, an LSTM aggregates them across time, and a
-linear head predicts the class — except the LSTM is replaced with the
-ConvLSTM from https://github.com/ndrplz/ConvLSTM_pytorch so spatial structure
-is preserved during temporal aggregation.
-
-Pipeline:
-    (B, T, 3, 224, 224)
-        -> reshape to (B*T, 3, 224, 224)
-        -> ResNet18 trunk (conv1..layer4) -> (B*T, 512, 7, 7)
-        -> reshape to (B, T, 512, 7, 7)
-        -> ConvLSTM -> last hidden state (B, hidden, 7, 7)
-        -> global avg pool -> (B, hidden)
-        -> Linear -> (B, num_classes)
-"""
-
 from __future__ import annotations
 
 import torch
@@ -27,8 +8,6 @@ from .convlstm import ConvLSTM
 
 
 class ResNet18Trunk(nn.Module):
-    """ResNet-18 with the classifier head removed; outputs (B, 512, 7, 7) for 224 inputs."""
-
     def __init__(self, pretrained: bool = True):
         super().__init__()
         weights = ResNet18_Weights.IMAGENET1K_V1 if pretrained else None
