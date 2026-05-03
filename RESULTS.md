@@ -108,13 +108,13 @@ After eval, note which classes get confused with each other the most. Look at of
 Fill in anything notable about your model -- what worked, what didn't, any surprises. Arthur will use this for the discussion section.
 
 ### TSM (Ayaan)
-- Pretrained from:
+- Pretrained from: ResNet50 with the ImageNet dataset, default weights
 - Fine-tuning strategy:
-- Optimizer / LR / Schedule:
-- Best val epoch:
-- What worked:
-- What didn't:
-- Failure modes (what does it get wrong?):
+- Optimizer / LR / Schedule: SGD, momentum=0.9, weight decay = 1e-4, Peak Learning Rate 0.02, Cosine Annealing Learning to 2.5e-04 over 30 epochs
+- Best val epoch: Epoch 30, val accuracy of 0.0626
+- What worked: Training accuracy went to 96% and loss drops steadily so model fits the training set
+- What didn't: Validation accuracy was between 1.7-6.3% very spiky, huge gap between training and val, maybe some overfitting and memorization
+- Failure modes (what does it get wrong?): Most Validation classes results may be random, errors are not class specific
 
 ### R(2+1)D (Ayaan)
 - Pretrained from:
