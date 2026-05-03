@@ -34,7 +34,7 @@ How expensive was each model to train. Important for the cost-vs-accuracy analys
 
 | Model | Training Time (hrs) | Peak VRAM (GB) | Frames/video | Frame Size | Batch Size | Epochs | GPU |
 |-------|--------------------:|---------------:|-------------:|-----------:|---------:|-------:|-----|
-| TSM | | | | 224 | | | |
+| TSM |13.17 |6.39 | 8| 224 |8 |30 |RTX 5090 |
 | R(2+1)D | | | | 224 | | | |
 | SlowFast | | | | 224 | | | |
 | TimeSformer | | | | 224 | | | |
