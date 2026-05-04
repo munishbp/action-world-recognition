@@ -24,9 +24,20 @@ from models.videomamba.models.videomamba import (
 )
 
 try:
-    from mamba_ssm.ops.triton.layernorm import RMSNorm
+    from mamba_ssm.ops.triton.layernorm import RMSNorm  # type: ignore
 except ImportError:
-    RMSNorm = None
+    try:
+        from mamba_ssm.ops.triton.layer_norm import RMSNorm  # type: ignore
+    except ImportError:
+        class RMSNorm(nn.Module):
+            def __init__(self, dim: int, eps: float = 1e-5):
+                super().__init__()
+                self.eps = eps
+                self.weight = nn.Parameter(torch.ones(dim))
+
+            def forward(self, x: torch.Tensor) -> torch.Tensor:
+                norm = x.pow(2).mean(-1, keepdim=True).add(self.eps).rsqrt()
+                return (x * norm) * self.weight.to(dtype=x.dtype)
 
 
 class Bimamba(Mamba):
@@ -341,7 +352,7 @@ def videomamba_small_bidir(pretrained=False, **kwargs):
         depth=24,
         rms_norm=True,
         residual_in_fp32=True,
-        fused_add_norm=True,
+        fused_add_norm=False,
         bimamba_type="v2",
         **kwargs,
     )
@@ -357,7 +368,7 @@ def videomamba_tiny_bidir(pretrained=False, **kwargs):
         depth=24,
         rms_norm=True,
         residual_in_fp32=True,
-        fused_add_norm=True,
+        fused_add_norm=False,
         bimamba_type="v2",
         **kwargs,
     )
