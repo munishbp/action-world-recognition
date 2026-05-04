@@ -34,6 +34,11 @@ sys.path.insert(0, _PROJECT_ROOT)
 
 from shared import evaluate_model, get_dataloader, save_results
 from models.videomamba.models.videomamba import videomamba_tiny, videomamba_small
+from models.videomamba.models.videomamba_bidir import (
+    videomamba_tiny_bidir,
+    videomamba_small_bidir,
+)
+from models.videomamba.load_pretrained import load_pretrained_init
 
 CHECKPOINT_DIR = os.path.join(_SCRIPT_DIR, "checkpoints")
 RESULTS_DIR    = os.path.join(_PROJECT_ROOT, "results")
@@ -124,6 +129,13 @@ def main():
     parser.add_argument("--data-root",   type=str,   default=os.path.join(_PROJECT_ROOT, "data", "something-something-v2"))
     parser.add_argument("--device",      type=str,   default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--resume",      type=str,   default=None,    help="Checkpoint path to resume from")
+    parser.add_argument("--init-from",   type=str,   default=None,
+                        help="Pretrained checkpoint path used only for weight initialization (e.g. K400 or IN1K). "
+                             "Drops head and inflates 2D->3D conv kernels as needed.")
+    parser.add_argument("--bidir",       action="store_true",
+                        help="Use bidirectional Mamba (matches OpenGVLab released SSv2/K400 checkpoints)")
+    parser.add_argument("--model-name",  type=str,   default="VideoMamba",
+                        help="Used for the results JSON filename (e.g. VideoMambaK400Finetuned)")
     parser.add_argument("--no-fp16",     action="store_true",          help="Disable mixed precision")
     parser.add_argument("--smoke-test",  action="store_true",          help="Run 2 train + 2 val batches for 1 epoch to verify pipeline")
     args = parser.parse_args()
@@ -156,9 +168,16 @@ def main():
     )
     print(f"Train: {len(train_loader.dataset):,} samples | Val: {len(val_loader.dataset):,} samples")
 
-    print(f"Building VideoMamba-{args.model.capitalize()}...")
-    build_fn = videomamba_tiny if args.model == "tiny" else videomamba_small
+    bidir_tag = " (bidirectional)" if args.bidir else ""
+    print(f"Building VideoMamba-{args.model.capitalize()}{bidir_tag}...")
+    if args.bidir:
+        build_fn = videomamba_tiny_bidir if args.model == "tiny" else videomamba_small_bidir
+    else:
+        build_fn = videomamba_tiny if args.model == "tiny" else videomamba_small
     model = build_fn(num_classes=NUM_CLASSES, num_frames=args.num_frames).to(device)
+
+    if args.init_from:
+        load_pretrained_init(model, args.init_from, drop_head=True)
 
     total_params     = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -274,14 +293,14 @@ def main():
     results = evaluate_model(
         final_logits.numpy(),
         final_labels.numpy(),
-        model_name="VideoMamba",
+        model_name=args.model_name,
         training_time_hours=round(training_time / 3600, 2),
         peak_vram_gb=round(peak_vram, 2),
         total_params=total_params,
         trainable_params=trainable_params,
     )
     save_results(results, output_dir=RESULTS_DIR)
-    print(f"Results saved to {os.path.join(RESULTS_DIR, 'VideoMamba_results.json')}")
+    print(f"Results saved to {os.path.join(RESULTS_DIR, args.model_name + '_results.json')}")
 
 
 if __name__ == "__main__":
