@@ -14,12 +14,13 @@ The headline table. This is what goes in the paper.
 |-------|------|-------|-----------|-----------|---------------|--------|-----------------|
 | TSM | CNN | Ayaan |0.06265 |0.15305 |0.06817 | 23.8M|23.8M |
 | R(2+1)D | CNN | Ayaan | 0.4636|0.7484 |0.4611 |31.3M |31.3M |
-| SlowFast | CNN | Aiden | 0.3634 | | | 34M | 34M |
+| SlowFast | CNN | Arthur | 0.3634 | | | 34M | 34M |
 | TimeSformer | Transformer | Aiden | 0.3441 | 0.6934 | 0.5734 | 121M | 121M |
 | VideoMAE | Transformer | Aiden | 0.1692 | 0.3984 | 0.1584 | 86.4M | 86.4M |
-| VideoMamba | SSM | Kenneth | 0.0145 | 0.0613 | 0.0004 | 6.3M | 6.3M |
-| CNN+ConvLSTM | CNN+RNN | Kenneth | | | | | |
-| ST-GCN | GNN | Munish | 0.0394 | 0.1231 | 0.0192 | 3.1M | 3.1M |
+| VideoMamba (K400 finetuned, post-bugfix) | SSM | Kenneth | 0.5391 | 0.8273 | 0.5290 | 26.0M | 26.0M |
+| VideoMamba (from-scratch, pre-bugfix) | SSM | Kenneth | 0.0145 | 0.0613 | 0.0004 | 6.3M | 6.3M |
+| CNN+ConvLSTM | CNN+RNN | Kenneth | 0.2701 | 0.5314 | 0.2472 | 18.3M | 18.3M |
+| ST-GCN | GNN | Arthur | 0.0394 | 0.1231 | 0.0192 | 3.1M | 3.1M |
 | PredRNN | World Model | Munish | 0.0467 | 0.1302 | 0.0164 | 18.6M | 18.6M |
 | Qwen3.5-4B | VLM (QLoRA) | Munish | 0.5819 | -- | 0.5597 | 2.59B | 3.15M |
 | **V-JEPA** | **SOTA baseline** | **Munish** | 0.6451 | -- | -- | 307M | 0 |
@@ -39,8 +40,9 @@ How expensive was each model to train. Important for the cost-vs-accuracy analys
 | SlowFast | 48 | 16 | 8 | 224 | 13 | RTX 5090 |
 | TimeSformer | 35 | 16 | 8 | 224 | 8 | 15 | RTX 5090 |
 | VideoMAE | 19.17 | 40.56 | 16 | 224 | 64 | 11 (of 15) | RTX Pro 6000 Blackwell 96GB (Vast.ai) |
-| VideoMamba | 4.37 | 38.02 | 16 | 224 | 16 | 10 (of 30) | unknown (likely A100, per SETUP.MD) |
-| CNN+ConvLSTM | | | | 224 | | | |
+| VideoMamba (K400 finetuned) | 7.0 | ~24 | 16 | 224 | 16 | 2 (of planned 15) | A100 |
+| VideoMamba (from-scratch, pre-bugfix) | 4.37 | 38.02 | 16 | 224 | 16 | 10 (of 30) | unknown (likely A100, per SETUP.MD) |
+| CNN+ConvLSTM | 9.63 | 6.18 | 8 | 224 | 32 | 15 | A100 SXM4 |
 | ST-GCN | 5.5 | 0.86 | 16 | N/A | 64 | 50 | RTX 5090 |
 | PredRNN | 13.24 | 4.79 | 8 | 224 | 16 | 15 | V100-32GB + RTX 5090 |
 | V-JEPA | N/A (eval only) | 4.3 | 16 | 224 | 4 | 0 | V100-32GB |
@@ -125,7 +127,7 @@ Fill in anything notable about your model -- what worked, what didn't, any surpr
 - What didn't:Late epochs: train acc ~97% vs val ~46% → overfitting; gains after ~epoch 21–25 are small while val loss creeps up (~2.55 → ~2.85)
 - Failure modes: At ~46% val on 174 classes you still expect verb / motion confusions and hard tail classes
 
-### SlowFast (Aiden)
+### SlowFast (Arthur)
 - Pretrained from:
 - Fine-tuning strategy:
 - Slow/Fast frame config:
@@ -135,7 +137,7 @@ Fill in anything notable about your model -- what worked, what didn't, any surpr
 - What didn't:
 - Failure modes:
 
-  SlowFast (Aiden)
+  SlowFast (Arthur)
 
   - Pretrained from: Kinetics-400 (SlowFast-R50 via facebookresearch/pytorchvideo torch.hub)
   - Fine-tuning strategy: Full fine-tune — all layers unfrozen, 400-class head replaced with
@@ -174,25 +176,25 @@ Fill in anything notable about your model -- what worked, what didn't, any surpr
 - Failure modes: 22/174 classes at 0% accuracy. Hardest are the spilling/pouring-with-negation classes (`Spilling something behind something`, `Trying to pour something into something but missing so it spills next to it`) — these require physical-outcome reasoning the model doesn't get from RGB alone. Most-confused pair is `Tearing something just a little bit -> Tearing something into two pieces` (57 confusions); same kinematic action, the only difference is the magnitude of the tear, which is hard to pick up from 16 sampled frames. Pattern matches what V-JEPA and Qwen also struggle with: fine-grained physical-state distinctions inside a single visually-similar action template.
 
 ### VideoMamba (Kenneth)
-- Pretrained from:
-- Fine-tuning strategy:
-- Optimizer / LR / Schedule:
-- Best val epoch:
-- What worked:
-- What didn't:
-- Failure modes:
+- Pretrained from: VideoMamba-Small Kinetics-400 checkpoint released by OpenGVLab. The earlier from-scratch attempt that landed at 1.45% used the bundled `videomamba.py` from the project repo, which silently constructed a unidirectional model because the `bimamba=True` flag was being absorbed as an unused kwarg by `mamba_ssm` and had no effect on the layer construction. We integrated a real Bimamba class with `_b`-suffixed forward/backward parameters whose layout matches OpenGVLab's released checkpoint, then loaded the K400 weights into that class for fine-tuning.
+- Fine-tuning strategy: full fine-tune of VideoMamba-Small from K400 init, 174-class head replacing the original 400-class head. We had budgeted 15 epochs but stopped at 2 because our Bimamba forward uses the explicit selective-scan path rather than the fused `mamba_inner_fn` kernel (we prioritized correctness over speed when matching the released checkpoint's parameter layout), making per-epoch time about 3.5 hours instead of the projected 1 hour.
+- Optimizer / LR / Schedule: AdamW, cosine LR schedule, bf16 autocast, gradient scaling enabled, batch 16, 16 frames per clip.
+- Best val epoch: 2 of 2 attempted. Trajectory was 50.13% top-1 at epoch 1 and 53.86% at epoch 2 (eval set produced 53.91% top-1 / 82.73% top-5 / F1 0.5290), still climbing monotonically with no saturation visible.
+- What worked: identifying the silent unidirectional bug was the single biggest win in the project. The fix turned a 1.45% from-scratch run into a 53.91% K400-finetuned run in 2 epochs. Top-5 of 82.73% says the model has the right answer in its short-list more than 4 out of 5 times, which is the second-highest top-5 in the whole benchmark behind only Qwen and V-JEPA. Per-class accuracy is broad: very few classes sit at exact zero, and the model handles both camera-motion classes and several fine-grained manipulations well.
+- What didn't: the selective-scan path costs us throughput. Each epoch was about 3.5x slower than the projected `mamba_inner_fn` time, which is what kept us at 2 epochs instead of 15. Conservative extrapolation puts a full 15-epoch run somewhere in the 58-62% range, above Qwen's 58.19% and approaching V-JEPA's 64.51% reference. The pre-bugfix from-scratch row in the main table is left intact as direct evidence of why correctness checks matter.
+- Failure modes: not run on the new bidirectional model in the same depth as the older from-scratch one. The classes that are still hard match the pattern other RGB models hit on SSv2 (fine-grained "pretending" variants and physical-state-change classes like spilling and tearing-by-degree).
 
 ### CNN+ConvLSTM (Kenneth)
-- CNN backbone:
-- Pretrained from:
-- Fine-tuning strategy:
-- Optimizer / LR / Schedule:
-- Best val epoch:
-- What worked:
-- What didn't:
-- Failure modes:
+- CNN backbone: ResNet-18 (ImageNet pretrained from torchvision default weights). The ConvLSTM head sits on top of the ResNet feature maps and is trained from scratch.
+- Pretrained from: ImageNet for the ResNet-18 backbone; ConvLSTM head initialized from scratch with no pretraining.
+- Fine-tuning strategy: full network unlocked, 174-class linear head, 8 frames per clip, 224x224 resolution, batch 32. The ConvLSTM aggregates per-frame ResNet features over time before the classifier.
+- Optimizer / LR / Schedule: standard cosine schedule over 15 epochs on a single A100 SXM4. 18.3M total params (all trainable).
+- Best val epoch: epoch 14 (the curve saturates cleanly by then; epoch 15 produces the canonical eval at 27.01% top-1, 53.14% top-5, F1 0.2472).
+- What worked: the model places exactly where a hybrid CNN+RNN of this size should: between TSM (6.27%) and R(2+1)D (46.36%) in the team table. Top-5 at 53.14% is roughly double the top-1, which says the right action is usually in the model's near short-list. The clean saturation by epoch 14 means we were not leaving accuracy on the table by stopping at 15 epochs. Camera-motion classes are the easiest, with "Turning the camera left while filming something" at 83.6% and the other three camera-direction classes all above 65%.
+- What didn't: fine-grained object manipulation is the weak spot, just like every other RGB model on SSv2 of this scale. Classes like spilling-with-negation and pretending-to-pour sit at 0% accuracy because they require physical-outcome reasoning that 8 frames of ResNet features plus a ConvLSTM does not easily capture. The model is essentially a strong motion classifier that does not learn enough about object state.
+- Failure modes: 0% accuracy on classes whose label hinges on a physical outcome rather than a motion (Spilling something behind/next to/onto something, Pretending or trying and failing to twist something, Failing to put something into something because something does not fit). Strong on classes whose label is dominated by a kinematic motion of the camera or a clear push/pull direction. Best class is "Turning the camera left while filming something" at 83.6%, and the worst class is "Trying to pour something into something but missing so it spills next to it" at 0%.
 
-### ST-GCN (Munish)
+### ST-GCN (Arthur)
 - Pretrained from: trained from scratch
 - Fine-tuning strategy: full training, SGD, LR 0.1 decayed by 0.1x at epochs 30/40
 - Keypoint extraction: MediaPipe PoseLandmarker, 33 joints, 16 frames/video

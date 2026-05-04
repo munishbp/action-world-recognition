@@ -31,3 +31,15 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+
+# Report (drafts, scripts, generated figures, .docx/.pdf output)
+report/
+*.docx
+*.pdf
+
+# Slide deck, Remotion project, animations, equation images, build scripts
+slides/
+*.pptx
+
+# Stale local copy pulled from origin/main during the report rebuild
+RESULTS_main.md
