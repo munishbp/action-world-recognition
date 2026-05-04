@@ -23,6 +23,11 @@ from models.videomamba.models.videomamba import (
     _init_weights,
 )
 
+try:
+    from mamba_ssm.ops.triton.layernorm import RMSNorm
+except ImportError:
+    RMSNorm = None
+
 
 class Bimamba(Mamba):
     """Bidirectional Mamba block (bimamba_type='v2'): adds backward-direction
@@ -186,7 +191,10 @@ def create_block_bidir(
         **ssm_cfg,
         **factory_kwargs,
     )
-    norm_cls = partial(nn.LayerNorm, eps=norm_epsilon, **factory_kwargs)
+    if rms_norm and RMSNorm is not None:
+        norm_cls = partial(RMSNorm, eps=norm_epsilon)
+    else:
+        norm_cls = partial(nn.LayerNorm, eps=norm_epsilon, **factory_kwargs)
     block = Block(
         d_model,
         mixer_cls,
@@ -268,7 +276,10 @@ class VisionMambaBidir(nn.Module):
             ]
         )
 
-        self.norm_f = nn.LayerNorm(embed_dim, eps=norm_epsilon, **factory_kwargs)
+        if rms_norm and RMSNorm is not None:
+            self.norm_f = RMSNorm(embed_dim, eps=norm_epsilon)
+        else:
+            self.norm_f = nn.LayerNorm(embed_dim, eps=norm_epsilon, **factory_kwargs)
 
         self.apply(segm_init_weights)
         self.head.apply(segm_init_weights)
@@ -283,21 +294,28 @@ class VisionMambaBidir(nn.Module):
         )
 
     def forward_features(self, x, inference_params=None):
-        x = self.patch_embed(x)  # (B*T, C', H', W') -> see PatchEmbed
+        x = self.patch_embed(x)  # (B, C', T, H, W)
         B, C, T, H, W = x.shape
+        # (B, T, H, W, C) -> (B, T*H*W, C)
         x = x.permute(0, 2, 3, 4, 1).reshape(B, T * H * W, C)
-        cls_token = self.cls_token.expand(B, -1, -1)
-        x = torch.cat((cls_token, x), dim=1)
 
-        # spatial pos embed
-        x = x + self.pos_embed
-        # temporal pos embed (broadcast across spatial tokens)
+        cls_token = self.cls_token.expand(B, -1, -1)
+        x = torch.cat((cls_token, x), dim=1)  # (B, 1 + T*H*W, C)
+
+        # Spatial pos embed: (1, 1+HW, C). Broadcast over time for non-cls tokens.
+        cls_pos = self.pos_embed[:, :1]                  # (1, 1, C)
+        spatial_pos = self.pos_embed[:, 1:]              # (1, HW, C)
+        spatial_pos = spatial_pos.repeat(1, T, 1)        # (1, T*HW, C)
+        full_pos = torch.cat((cls_pos, spatial_pos), dim=1)  # (1, 1+T*HW, C)
+        x = x + full_pos
+
+        # Temporal pos embed: (1, T, C). Broadcast over spatial tokens.
         cls_tokens = x[:, :1]
-        x = x[:, 1:]
-        x = rearrange(x, "b (t n) m -> (b n) t m", t=T)
-        x = x + self.temporal_pos_embedding
-        x = rearrange(x, "(b n) t m -> b (t n) m", b=B)
-        x = torch.cat((cls_tokens, x), dim=1)
+        rest = x[:, 1:]                                  # (B, T*HW, C)
+        rest = rearrange(rest, "b (t n) m -> (b n) t m", t=T)
+        rest = rest + self.temporal_pos_embedding
+        rest = rearrange(rest, "(b n) t m -> b (t n) m", b=B)
+        x = torch.cat((cls_tokens, rest), dim=1)
         x = self.pos_drop(x)
 
         residual = None
@@ -321,9 +339,9 @@ def videomamba_small_bidir(pretrained=False, **kwargs):
         patch_size=16,
         embed_dim=384,
         depth=24,
-        rms_norm=False,
+        rms_norm=True,
         residual_in_fp32=True,
-        fused_add_norm=False,
+        fused_add_norm=True,
         bimamba_type="v2",
         **kwargs,
     )
@@ -337,9 +355,9 @@ def videomamba_tiny_bidir(pretrained=False, **kwargs):
         patch_size=16,
         embed_dim=192,
         depth=24,
-        rms_norm=False,
+        rms_norm=True,
         residual_in_fp32=True,
-        fused_add_norm=False,
+        fused_add_norm=True,
         bimamba_type="v2",
         **kwargs,
     )
