@@ -97,8 +97,8 @@ After eval, note which classes get confused with each other the most. Look at of
 | SlowFast | | | |
 | TimeSformer | | | |
 | VideoMAE | Tearing something just a little bit -> Tearing something into two pieces | 57 | Both involve the same tearing motion; the distinction is degree, not kinematics |
-| VideoMamba | | | |
-| CNN+ConvLSTM | | | |
+| VideoMamba | Tearing something just a little bit -> Tearing something into two pieces | 76 | Same most-confused pair as VideoMAE and CNN+ConvLSTM; the tearing motion is identical at clip start, the distinction is degree-of-completion (a state-classification problem, not a motion one) — a recurring weak spot across architectures on SSv2 |
+| CNN+ConvLSTM | Tearing something just a little bit -> Tearing something into two pieces | 70 | Same as VideoMAE/VideoMamba: model sees the tearing motion but cannot disambiguate "partial" from "complete" because the ConvLSTM compresses the temporal trajectory before the end-state is visible |
 | ST-GCN | | | |
 | PredRNN | Something falling like a rock -> Moving something down | 95 | Semantically sensible, falling is a kind of moving down |
 | Qwen3.5-4B | Plugging something into something -> Plugging something into something but pulling it right out as you remove your hand | 429 | Picks up the "plug in" motion but misses the extended "pull out" that distinguishes the longer label |
